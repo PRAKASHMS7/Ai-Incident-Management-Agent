@@ -1,0 +1,23 @@
+{
+  "services": [
+    {"name": "api-gateway", "language": "go", "version": "v1.0.0"},
+    {"name": "auth-service", "language": "python", "version": "v2.1.0"},
+    {"name": "payment-service", "language": "python", "version": "v1.2.0"},
+    {"name": "shipping-service", "language": "go", "version": "v1.0.4"},
+    {"name": "inventory-service", "language": "java", "version": "v3.0.1"}
+  ],
+  "databases": [
+    {"name": "user-db", "type": "postgres"},
+    {"name": "payment-db", "type": "postgres"},
+    {"name": "inventory-db", "type": "redis"}
+  ],
+  "dependencies": [
+    {"source": "api-gateway", "target": "auth-service", "protocol": "http", "p99_latency_threshold_ms": 150},
+    {"source": "api-gateway", "target": "payment-service", "protocol": "http", "p99_latency_threshold_ms": 250},
+    {"source": "api-gateway", "target": "shipping-service", "protocol": "http", "p99_latency_threshold_ms": 200},
+    {"source": "auth-service", "target": "user-db", "protocol": "sql", "p99_latency_threshold_ms": 50},
+    {"source": "payment-service", "target": "payment-db", "protocol": "sql", "p99_latency_threshold_ms": 80},
+    {"source": "shipping-service", "target": "inventory-service", "protocol": "grpc", "p99_latency_threshold_ms": 100},
+    {"source": "inventory-service", "target": "inventory-db", "protocol": "redis", "p99_latency_threshold_ms": 15}
+  ]
+}

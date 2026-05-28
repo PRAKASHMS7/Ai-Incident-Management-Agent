@@ -1,0 +1,32 @@
+groups:
+  - name: incident-agent-alerts
+    rules:
+      - alert: AgentHeartbeatLost
+        expr: absent(incident_agent_heartbeat) or (time() - incident_agent_heartbeat > 60)
+        for: 1m
+        labels:
+          severity: critical
+          tier: platform
+        annotations:
+          summary: "Incident Agent watchdog heartbeat lost"
+          description: "The AI Incident Agent watchdog has stopped reporting heartbeats for more than 60 seconds. The service might have crashed or hung."
+
+      - alert: LLMInferenceFailureRateHigh
+        expr: rate(llm_reasoning_latency_seconds_count{status="failed"}[5m]) / rate(llm_reasoning_latency_seconds_count[5m]) > 0.15
+        for: 5m
+        labels:
+          severity: warning
+          tier: ai-backend
+        annotations:
+          summary: "LLM Reasoning inference failure rate high"
+          description: "Groq LLM Llama reasoning calls are failing with an error rate higher than 15% in the last 5 minutes."
+
+      - alert: SlackAPIOutage
+        expr: rate(slack_escalation_delivery_total{status="failed"}[10m]) / rate(slack_escalation_delivery_total[10m]) > 0.20
+        for: 5m
+        labels:
+          severity: critical
+          tier: escalation
+        annotations:
+          summary: "Slack Bolt escalation card delivery failures"
+          description: "Over 20% of SRE escalation message dispatches to Slack failed in the last 10 minutes."

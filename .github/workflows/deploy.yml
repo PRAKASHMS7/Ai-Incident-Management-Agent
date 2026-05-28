@@ -1,0 +1,181 @@
+name: SRE Agent CI/CD Workflow
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint-and-format:
+    name: Lint & Code Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Linting Tools
+        run: |
+          pip install ruff black
+
+      - name: Run Ruff Linter
+        run: ruff check src/ tests/
+
+      - name: Run Black Code Formatter Check
+        run: black --check src/ tests/
+
+  type-check:
+    name: TypeScript & Python Static Typing Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Type Checkers
+        run: |
+          pip install -r requirements.txt
+          pip install mypy types-redis types-requests
+
+      - name: Run Python MyPy static checks
+        run: mypy --ignore-missing-imports src/
+
+      - name: Set up Node.js for Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run TypeScript typecheck
+        run: |
+          cd frontend
+          npm run build --noEmit || npx tsc --noEmit
+
+  unit-tests:
+    name: Python Unit Tests
+    needs: [lint-and-format, type-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run Pytest Unit Tests
+        run: pytest tests/unit
+        env:
+          ENV: test
+          REDIS_HOST: localhost
+          NEO4J_URI: bolt://localhost:7687
+          GROQ_API_KEY: mock_key
+          SLACK_BOT_TOKEN: mock_token
+          SLACK_SIGNING_SECRET: mock_secret
+
+  integration-tests:
+    name: E2E Integration Tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run Pytest Integration Tests
+        run: pytest tests/integration
+        env:
+          ENV: test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NEO4J_URI: bolt://localhost:7687  # Run in degraded neo4j mock mode during CI
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: password
+          GROQ_API_KEY: mock_key
+          SLACK_BOT_TOKEN: mock_token
+          SLACK_SIGNING_SECRET: mock_secret
+
+  docker-build-and-scan:
+    name: Build & Scan Docker Images
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        run: |
+          docker build -t sre-incident-agent-backend:latest -f Dockerfile .
+
+      - name: Build Frontend Docker Image
+        run: |
+          cd frontend
+          docker build -t sre-incident-agent-frontend:latest -f Dockerfile .
+
+      - name: Run Vulnerability Scan on Backend Image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'sre-incident-agent-backend:latest'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Vulnerability Scan on Frontend Image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'sre-incident-agent-frontend:latest'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

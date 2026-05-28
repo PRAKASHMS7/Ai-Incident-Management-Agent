@@ -1,0 +1,83 @@
+{
+  "single_firing_alert": {
+    "receiver": "webhook-receiver",
+    "status": "firing",
+    "alerts": [
+      {
+        "labels": {
+          "alertname": "Http5xxRateHigh",
+          "service": "payment-service",
+          "severity": "critical",
+          "instance": "payment-pod-1"
+        },
+        "annotations": {
+          "summary": "High 5xx error rate in payment-service",
+          "description": "The payment-service HTTP 5xx rate has exceeded 5% over 5 minutes."
+        },
+        "startsAt": "2026-05-26T12:00:00Z",
+        "generatorURL": "http://prometheus/graph?g0.expr=http_requests_total"
+      }
+    ]
+  },
+  "duplicate_firing_alert": {
+    "receiver": "webhook-receiver",
+    "status": "firing",
+    "alerts": [
+      {
+        "labels": {
+          "alertname": "Http5xxRateHigh",
+          "service": "payment-service",
+          "severity": "critical",
+          "instance": "payment-pod-1"
+        },
+        "annotations": {
+          "summary": "High 5xx error rate in payment-service",
+          "description": "The payment-service HTTP 5xx rate has exceeded 5% over 5 minutes."
+        },
+        "startsAt": "2026-05-26T12:00:15Z",
+        "generatorURL": "http://prometheus/graph?g0.expr=http_requests_total"
+      }
+    ]
+  },
+  "second_alert_same_service": {
+    "receiver": "webhook-receiver",
+    "status": "firing",
+    "alerts": [
+      {
+        "labels": {
+          "alertname": "DBConnectionPoolExhausted",
+          "service": "payment-service",
+          "severity": "critical",
+          "instance": "payment-pod-1"
+        },
+        "annotations": {
+          "summary": "DB pool exhaustion in payment-service",
+          "description": "Active DB connections have reached 100% of limits."
+        },
+        "startsAt": "2026-05-26T12:00:30Z",
+        "generatorURL": "http://prometheus/graph?g0.expr=db_pool"
+      }
+    ]
+  },
+  "resolved_alert": {
+    "receiver": "webhook-receiver",
+    "status": "resolved",
+    "alerts": [
+      {
+        "labels": {
+          "alertname": "Http5xxRateHigh",
+          "service": "payment-service",
+          "severity": "critical",
+          "instance": "payment-pod-1"
+        },
+        "annotations": {
+          "summary": "High 5xx error rate in payment-service resolved",
+          "description": "The payment-service HTTP 5xx rate has returned to normal."
+        },
+        "startsAt": "2026-05-26T12:00:00Z",
+        "endsAt": "2026-05-26T12:05:00Z",
+        "generatorURL": "http://prometheus/graph?g0.expr=http_requests_total"
+      }
+    ]
+  }
+}
