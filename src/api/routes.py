@@ -24,6 +24,8 @@ from src.database.redis_client import redis_manager
 from src.database.neo4j_client import neo4j_manager
 from src.core.correlation import CorrelationEngine
 from src.services import RCAGenerator
+from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
+from src.services.slack_client import slack_app
 
 logger = logging.getLogger(__name__)
 
@@ -453,11 +455,6 @@ def get_rca_metadata_json(id: str) -> Dict[str, Any]:
 
 
 # Slack Webhook endpoint callback router
-from slack_bolt.adapter.fastapi.async_handler import (
-    AsyncSlackRequestHandler,
-)  # noqa: E402
-from src.services.slack_client import slack_app  # noqa: E402
-
 slack_handler = AsyncSlackRequestHandler(slack_app)
 
 
