@@ -15,18 +15,20 @@ from langgraph.checkpoint.base import (
     Checkpoint,
     CheckpointMetadata,
     CheckpointTuple,
-    ChannelVersions
+    ChannelVersions,
 )
 
 from src.database.redis_client import redis_manager
 
 logger = logging.getLogger(__name__)
 
+
 class RedisCheckpointSaver(BaseCheckpointSaver):
     """
     Saves LangGraph checkpoints to Redis for state persistence and recovery.
     Provides both sync and async methods.
     """
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -36,27 +38,29 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         """
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
-        
+
         redis_key = f"checkpoint:{thread_id}:{checkpoint_ns}"
-        
+
         try:
             client = redis_manager.get_client()
             hex_data = client.get(redis_key)
             if not hex_data:
                 logger.debug("No checkpoint found in Redis for key: %s", redis_key)
                 return None
-                
+
             checkpoint_data = pickle.loads(bytes.fromhex(hex_data))
-            
+
             # Reconstruct CheckpointTuple
             return CheckpointTuple(
                 config=config,
                 checkpoint=checkpoint_data["checkpoint"],
                 metadata=checkpoint_data["metadata"],
-                parent_config=checkpoint_data.get("parent_config")
+                parent_config=checkpoint_data.get("parent_config"),
             )
         except Exception as e:
-            logger.error("Failed to load checkpoint from Redis key %s: %s", redis_key, str(e))
+            logger.error(
+                "Failed to load checkpoint from Redis key %s: %s", redis_key, str(e)
+            )
             return None
 
     async def aget_tuple(self, config: RunnableConfig) -> Optional[CheckpointTuple]:
@@ -70,32 +74,32 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         config: RunnableConfig,
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
-        new_versions: ChannelVersions
+        new_versions: ChannelVersions,
     ) -> RunnableConfig:
         """
         Saves a checkpoint state snapshot to Redis.
         """
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
-        
+
         redis_key = f"checkpoint:{thread_id}:{checkpoint_ns}"
-        
+
         try:
             checkpoint_data = {
                 "checkpoint": checkpoint,
                 "metadata": metadata,
-                "parent_config": config.get("parent_config")
+                "parent_config": config.get("parent_config"),
             }
-            
+
             # Serialize using pickle and save with 24-hour expiration
             hex_data = pickle.dumps(checkpoint_data).hex()
             client = redis_manager.get_client()
             client.set(redis_key, hex_data, ex=86400)
-            
+
             logger.debug("Saved state checkpoint in Redis: %s", redis_key)
         except Exception as e:
             logger.error("Failed to save checkpoint in Redis: %s", str(e))
-            
+
         return config
 
     async def aput(
@@ -103,7 +107,7 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         config: RunnableConfig,
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
-        new_versions: ChannelVersions
+        new_versions: ChannelVersions,
     ) -> RunnableConfig:
         """
         Asynchronously saves a checkpoint state snapshot to Redis.
@@ -114,8 +118,9 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         self,
         config: Optional[RunnableConfig],
         *,
+        filter: Optional[dict[str, Any]] = None,
         before: Optional[RunnableConfig] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> Iterator[CheckpointTuple]:
         """
         Lists checkpoints.
@@ -126,8 +131,9 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         self,
         config: Optional[RunnableConfig],
         *,
+        filter: Optional[dict[str, Any]] = None,
         before: Optional[RunnableConfig] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> AsyncIterator[CheckpointTuple]:
         """
         Asynchronously lists checkpoints.
@@ -137,11 +143,7 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
             yield None
 
     def put_writes(
-        self,
-        config: RunnableConfig,
-        writes: Any,
-        task_id: str,
-        task_path: str = ""
+        self, config: RunnableConfig, writes: Any, task_id: str, task_path: str = ""
     ) -> None:
         """
         Saves intermediate checkpoint writes to Redis.
@@ -149,7 +151,7 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         redis_key = f"checkpoint:writes:{thread_id}:{checkpoint_ns}:{task_id}"
-        
+
         try:
             hex_data = pickle.dumps(writes).hex()
             client = redis_manager.get_client()
@@ -158,11 +160,7 @@ class RedisCheckpointSaver(BaseCheckpointSaver):
             logger.error("Failed to save checkpoint writes: %s", str(e))
 
     async def aput_writes(
-        self,
-        config: RunnableConfig,
-        writes: Any,
-        task_id: str,
-        task_path: str = ""
+        self, config: RunnableConfig, writes: Any, task_id: str, task_path: str = ""
     ) -> None:
         """
         Asynchronously saves intermediate checkpoint writes to Redis.

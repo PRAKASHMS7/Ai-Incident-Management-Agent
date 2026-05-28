@@ -6,7 +6,6 @@ and incident state repositories for Redis.
 """
 
 import hashlib
-import json
 import logging
 from typing import Dict, Any, List, Optional
 import redis
@@ -18,10 +17,12 @@ from src.observability.metrics import alert_deduplicated_total
 
 logger = logging.getLogger(__name__)
 
+
 class RedisClientManager:
     """
     Manages the Redis connection lifecycle and state repositories.
     """
+
     def __init__(self) -> None:
         self.host: str = settings.REDIS_HOST
         self.port: int = settings.REDIS_PORT
@@ -37,7 +38,7 @@ class RedisClientManager:
                 "Initializing Redis connection pool to %s:%d db=%d",
                 self.host,
                 self.port,
-                self.db
+                self.db,
             )
             pool = redis.ConnectionPool(
                 host=self.host,
@@ -46,7 +47,7 @@ class RedisClientManager:
                 password=settings.REDIS_PASSWORD,
                 decode_responses=True,
                 socket_timeout=5.0,
-                socket_connect_timeout=5.0
+                socket_connect_timeout=5.0,
             )
             self._client = redis.Redis(connection_pool=pool)
         return self._client
@@ -68,19 +69,19 @@ class RedisClientManager:
                             "host": self.host,
                             "port": self.port,
                             "db": self.db,
-                            "ping": "pong"
-                        }
+                            "ping": "pong",
+                        },
                     }
                 return {
                     "status": "unhealthy",
-                    "details": "Ping did not return a successful response."
+                    "details": "Ping did not return a successful response.",
                 }
             except redis.RedisError as e:
                 logger.error("Redis health check failed: %s", str(e), exc_info=True)
                 span.record_exception(e)
                 return {
                     "status": "unhealthy",
-                    "details": f"Connection failed: {str(e)}"
+                    "details": f"Connection failed: {str(e)}",
                 }
 
     def check_deduplicate(
@@ -88,12 +89,12 @@ class RedisClientManager:
         alertname: str,
         service: str,
         severity: str,
-        instance: Optional[str] = None
+        instance: Optional[str] = None,
     ) -> bool:
         """
         Calculates a unique hash for an alert and checks if it has fired recently.
         If unique, saves it with a 60-second TTL to collapse duplicates.
-        
+
         Returns:
             bool: True if it is a duplicate (should be dropped), False if it is unique.
         """
@@ -102,30 +103,36 @@ class RedisClientManager:
             span.set_attribute("db.operation", "check_deduplicate")
             span.set_attribute("redis.alertname", alertname)
             span.set_attribute("redis.service", service)
-            
+
             client = self.get_client()
-            
+
             # Build deterministic hash key
             raw_string = f"{alertname}:{service}:{severity}:{instance or ''}"
             alert_hash = hashlib.sha256(raw_string.encode("utf-8")).hexdigest()
             redis_key = f"dedup:alert:{alert_hash}"
             span.set_attribute("redis.key", redis_key)
-            
+
             try:
                 # Try to set the key only if it does not exist (NX) with a 60s TTL (EX)
                 success = client.set(redis_key, "1", ex=60, nx=True)
                 if success:
-                    logger.debug("Deduplication check passed. New alert hash: %s", alert_hash)
+                    logger.debug(
+                        "Deduplication check passed. New alert hash: %s", alert_hash
+                    )
                     span.set_attribute("redis.duplicate", False)
                     return False
                 logger.info("Alert deduplicated. Dropping alert: %s", raw_string)
                 span.set_attribute("redis.duplicate", True)
-                
+
                 # Increment SRE Alert deduplicated counter
-                alert_deduplicated_total.labels(service=service, alertname=alertname).inc()
+                alert_deduplicated_total.labels(
+                    service=service, alertname=alertname
+                ).inc()
                 return True
             except redis.RedisError as e:
-                logger.error("Deduplication lookup failed, defaulting to allow alert: %s", str(e))
+                logger.error(
+                    "Deduplication lookup failed, defaulting to allow alert: %s", str(e)
+                )
                 span.record_exception(e)
                 return False
 
@@ -137,21 +144,26 @@ class RedisClientManager:
         with tracer.start_as_current_span("redis.write") as span:
             span.set_attribute("db.system", "redis")
             span.set_attribute("db.operation", "save_incident")
-            
+
             client = self.get_client()
             incident_key = f"incident:state:{incident.id}"
             active_set_key = "incident:active_ids"
             span.set_attribute("redis.key", incident_key)
-            
+
             # Serialize Model using Pydantic
             serialized_data = incident.model_dump_json()
-            
+
             try:
                 # Save incident state (24-hour expiration)
                 client.set(incident_key, serialized_data, ex=86400)
-                
+
                 # Manage active ID indexing based on state transitions
-                if incident.state in ["open", "analyzing", "awaiting_approval", "escalated"]:
+                if incident.state in [
+                    "open",
+                    "analyzing",
+                    "awaiting_approval",
+                    "escalated",
+                ]:
                     client.sadd(active_set_key, incident.id)
                     # Map affected services
                     for service in incident.services_affected:
@@ -161,10 +173,12 @@ class RedisClientManager:
                     client.srem(active_set_key, incident.id)
                     for service in incident.services_affected:
                         client.srem(f"service:active_incidents:{service}", incident.id)
-                        
+
                 logger.info("Saved incident %s (state=%s)", incident.id, incident.state)
             except redis.RedisError as e:
-                logger.error("Failed to save incident %s to Redis: %s", incident.id, str(e))
+                logger.error(
+                    "Failed to save incident %s to Redis: %s", incident.id, str(e)
+                )
                 span.record_exception(e)
 
     def get_incident(self, incident_id: str) -> Optional[IncidentStateModel]:
@@ -174,11 +188,11 @@ class RedisClientManager:
         with tracer.start_as_current_span("redis.read") as span:
             span.set_attribute("db.system", "redis")
             span.set_attribute("db.operation", "get_incident")
-            
+
             client = self.get_client()
             incident_key = f"incident:state:{incident_id}"
             span.set_attribute("redis.key", incident_key)
-            
+
             try:
                 data = client.get(incident_key)
                 if data:
@@ -199,10 +213,10 @@ class RedisClientManager:
         with tracer.start_as_current_span("redis.read") as span:
             span.set_attribute("db.system", "redis")
             span.set_attribute("db.operation", "get_active_incidents")
-            
+
             client = self.get_client()
             active_set_key = "incident:active_ids"
-            
+
             try:
                 active_ids = client.smembers(active_set_key)
                 incidents = []
@@ -212,7 +226,10 @@ class RedisClientManager:
                         incidents.append(inc)
                     else:
                         # Clean up expired active ID from index sets to prevent leakage
-                        logger.warning("Active incident %s has expired from state. Cleaning index.", inc_id)
+                        logger.warning(
+                            "Active incident %s has expired from state. Cleaning index.",
+                            inc_id,
+                        )
                         client.srem(active_set_key, inc_id)
                 return incidents
             except redis.RedisError as e:
@@ -229,6 +246,7 @@ class RedisClientManager:
             client.flushdb()
         except redis.RedisError as e:
             logger.error("FlushDB failed: %s", str(e))
+
 
 # Global singleton client manager
 redis_manager = RedisClientManager()

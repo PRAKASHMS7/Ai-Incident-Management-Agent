@@ -3,11 +3,11 @@ Unit tests for the Slack Escalation System templates and channel routing.
 """
 
 import pytest
-import json
 from unittest.mock import MagicMock, patch
 
-from src.services.slack_client import SlackClient, slack_client
+from src.services.slack_client import SlackClient
 from src.api.schemas import Hypothesis
+
 
 def test_slack_block_builders():
     """
@@ -25,6 +25,7 @@ def test_slack_block_builders():
 
     # 2. Context block
     from datetime import datetime
+
     dt = datetime(2026, 5, 26, 12, 0, 0)
     ctx = client.context_block("inc-123", dt, ["billing-service", "auth-service"])
     assert ctx["type"] == "context"
@@ -33,8 +34,20 @@ def test_slack_block_builders():
 
     # 3. Hypotheses block
     hyps = [
-        Hypothesis(rank=1, hypothesis="H1", confidence_score=0.85, evidence=["E1"], recommended_action="A1"),
-        Hypothesis(rank=2, hypothesis="H2", confidence_score=0.45, evidence=["E2"], recommended_action="A2")
+        Hypothesis(
+            rank=1,
+            hypothesis="H1",
+            confidence_score=0.85,
+            evidence=["E1"],
+            recommended_action="A1",
+        ),
+        Hypothesis(
+            rank=2,
+            hypothesis="H2",
+            confidence_score=0.45,
+            evidence=["E2"],
+            recommended_action="A2",
+        ),
     ]
     hyp_block = client.hypotheses_block(hyps)
     assert hyp_block["type"] == "section"
@@ -64,7 +77,7 @@ async def test_slack_channel_routing():
         mock_r = MagicMock()
         mock_r.hget.return_value = None
         mock_get_redis.return_value = mock_r
-        
+
         target = await client.get_routing_channel("unknown-service")
         assert target == "mock_channel"  # default settings.SLACK_CHANNEL
 
@@ -73,7 +86,7 @@ async def test_slack_channel_routing():
         mock_r = MagicMock()
         mock_r.hget.return_value = "#payment-alerts-team"
         mock_get_redis.return_value = mock_r
-        
+
         target = await client.get_routing_channel("payment-service")
         assert target == "#payment-alerts-team"
         mock_r.hget.assert_called_once_with("slack:channel_routing", "payment-service")

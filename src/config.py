@@ -20,6 +20,7 @@ if ENV_PATH.exists():
 else:
     load_dotenv()
 
+
 def resolve_secret_value(value: Optional[str]) -> Optional[str]:
     """
     Resolves secret values by checking if they are paths to Docker secrets
@@ -27,7 +28,7 @@ def resolve_secret_value(value: Optional[str]) -> Optional[str]:
     """
     if not value or not isinstance(value, str):
         return value
-        
+
     # 1. Docker Secrets Resolution (e.g. /run/secrets/redis_password)
     if value.startswith("/run/secrets/") or os.path.exists(value):
         try:
@@ -49,14 +50,16 @@ def resolve_secret_value(value: Optional[str]) -> Optional[str]:
 
     return value
 
+
 class Settings(BaseSettings):
     """
     Application Settings container.
     """
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_PATH) if ENV_PATH.exists() else None,
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     # Server Configuration
@@ -95,6 +98,7 @@ class Settings(BaseSettings):
         self.GROQ_API_KEY = resolve_secret_value(self.GROQ_API_KEY)
         self.SLACK_BOT_TOKEN = resolve_secret_value(self.SLACK_BOT_TOKEN)
         self.SLACK_SIGNING_SECRET = resolve_secret_value(self.SLACK_SIGNING_SECRET)
+
 
 # Global settings singleton
 settings = Settings()

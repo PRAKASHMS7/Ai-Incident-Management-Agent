@@ -1,11 +1,11 @@
 import os
 import tempfile
-import pytest
 from fastapi.testclient import TestClient
 from src.main import app
-from src.config import resolve_secret_value, Settings
+from src.config import resolve_secret_value
 
 client = TestClient(app)
+
 
 def test_secrets_resolution_env_vars():
     """
@@ -13,6 +13,7 @@ def test_secrets_resolution_env_vars():
     """
     assert resolve_secret_value("standard_value") == "standard_value"
     assert resolve_secret_value(None) is None
+
 
 def test_secrets_resolution_docker_secrets():
     """
@@ -28,6 +29,7 @@ def test_secrets_resolution_docker_secrets():
     finally:
         os.remove(temp_file_path)
 
+
 def test_secrets_resolution_vault_placeholders():
     """
     Verifies that resolve_secret_value parses vault placeholders.
@@ -36,17 +38,22 @@ def test_secrets_resolution_vault_placeholders():
     resolved = resolve_secret_value(vault_str)
     assert resolved == "vault_resolved_api_key_from_secret_data_sre_groq"
 
+
 def test_health_endpoints_health_checks():
     """
     Verifies FastAPI health endpoints return expected schema structures.
     """
     response = client.get("/health")
-    assert response.status_code in [200, 503]  # Accept both (depends on if Redis/Neo4j mock are active)
+    assert response.status_code in [
+        200,
+        503,
+    ]  # Accept both (depends on if Redis/Neo4j mock are active)
     data = response.json()
     assert "status" in data
     assert "components" in data
     assert "redis" in data["components"]
     assert "neo4j" in data["components"]
+
 
 def test_deployment_env_profiles_exist():
     """

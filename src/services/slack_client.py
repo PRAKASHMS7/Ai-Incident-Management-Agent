@@ -6,32 +6,41 @@ tenacity-protected Web API postings, and incident state synchronization.
 """
 
 import logging
-import json
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import slack_sdk
 from slack_bolt.async_app import AsyncApp
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 
 from src.config import settings
 from src.database.redis_client import redis_manager
 from src.api.schemas import TimelineItem
 from src.observability.tracer import tracer
-from src.observability.metrics import slack_escalation_delivery_total, operator_acknowledgement_duration_seconds
+from src.observability.metrics import (
+    slack_escalation_delivery_total,
+    operator_acknowledgement_duration_seconds,
+)
 
 logger = logging.getLogger(__name__)
 
 # Initialize Slack Bolt AsyncApp
 slack_app = AsyncApp(
-    token=settings.SLACK_BOT_TOKEN,
-    signing_secret=settings.SLACK_SIGNING_SECRET
+    token=settings.SLACK_BOT_TOKEN, signing_secret=settings.SLACK_SIGNING_SECRET
 )
+
 
 class SlackClient:
     """
     Service client wrapping Slack Bolt SDK integrations.
     """
+
     def __init__(self, app: AsyncApp = slack_app) -> None:
         self.app = app
         self.client = app.client
@@ -46,20 +55,22 @@ class SlackClient:
             "text": {
                 "type": "plain_text",
                 "text": f"{emoji} {severity_str} INCIDENT ESCALATION - ID: {incident_id}",
-                "emoji": True
-            }
+                "emoji": True,
+            },
         }
 
     @staticmethod
-    def context_block(incident_id: str, timestamp: datetime, services: List[str]) -> Dict[str, Any]:
+    def context_block(
+        incident_id: str, timestamp: datetime, services: List[str]
+    ) -> Dict[str, Any]:
         return {
             "type": "context",
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Incident ID:* `{incident_id}` | *Triggered:* `{timestamp.strftime('%Y-%m-%d %H:%M:%S')}` | *Services Affected:* `{', '.join(services)}`"
+                    "text": f"*Incident ID:* `{incident_id}` | *Triggered:* `{timestamp.strftime('%Y-%m-%d %H:%M:%S')}` | *Services Affected:* `{', '.join(services)}`",
                 }
-            ]
+            ],
         }
 
     @staticmethod
@@ -72,18 +83,12 @@ class SlackClient:
             green_blocks = "🟩" * (pct // 10)
             white_blocks = "⬜" * (10 - (pct // 10))
             bar = f"[{green_blocks}{white_blocks}] {pct}%"
-            
+
             text += f"*{h.rank}. {h.hypothesis}*\n"
             text += f"  - *Confidence:* {bar}\n"
             text += f"  - *Evidence:* {', '.join(h.evidence)}\n"
             text += f"  - *Action:* {h.recommended_action}\n\n"
-        return {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": text.strip()
-            }
-        }
+        return {"type": "section", "text": {"type": "mrkdwn", "text": text.strip()}}
 
     @staticmethod
     def actions_block(incident_id: str) -> Dict[str, Any]:
@@ -94,24 +99,18 @@ class SlackClient:
                 {
                     "type": "button",
                     "action_id": "slack_ack_incident",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "✅ Acknowledge"
-                    },
+                    "text": {"type": "plain_text", "text": "✅ Acknowledge"},
                     "style": "primary",
-                    "value": incident_id
+                    "value": incident_id,
                 },
                 {
                     "type": "button",
                     "action_id": "slack_resolve_incident",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "🛡️ Resolve"
-                    },
+                    "text": {"type": "plain_text", "text": "🛡️ Resolve"},
                     "style": "danger",
-                    "value": incident_id
-                }
-            ]
+                    "value": incident_id,
+                },
+            ],
         }
 
     # 2. Dynamic Routing Lookup
@@ -123,12 +122,23 @@ class SlackClient:
             redis_client = redis_manager.get_client()
             channel = redis_client.hget("slack:channel_routing", service_name)
             if channel:
-                logger.info("Slack dynamic routing MATCH: Service %s -> Channel %s", service_name, channel)
+                logger.info(
+                    "Slack dynamic routing MATCH: Service %s -> Channel %s",
+                    service_name,
+                    channel,
+                )
                 return channel
         except Exception as e:
-            logger.warning("Failed to query Redis slack dynamic channel routing mapping: %s", str(e))
-            
-        logger.debug("Slack routing FALLBACK: Service %s -> Default %s", service_name, settings.SLACK_CHANNEL)
+            logger.warning(
+                "Failed to query Redis slack dynamic channel routing mapping: %s",
+                str(e),
+            )
+
+        logger.debug(
+            "Slack routing FALLBACK: Service %s -> Default %s",
+            service_name,
+            settings.SLACK_CHANNEL,
+        )
         return settings.SLACK_CHANNEL
 
     # 3. Web API wrapper protected by Tenacity Retries
@@ -137,32 +147,42 @@ class SlackClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=2, max=10),
         before_sleep=before_sleep_log(logger, logging.WARNING),
-        reraise=True
+        reraise=True,
     )
-    async def post_message_with_retry(self, channel: str, blocks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def post_message_with_retry(
+        self, channel: str, blocks: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """
         Posts message to Slack API. Protected by Tenacity retries on SlackApiError/RateLimits.
         """
         with tracer.start_as_current_span("slack.post_message") as span:
             span.set_attribute("slack.channel", channel)
-            
+
             # If credentials are mock, skip real call
             if settings.SLACK_BOT_TOKEN == "mock_token":
-                logger.info("Mock Slack client post message triggered to channel: %s", channel)
-                slack_escalation_delivery_total.labels(channel=channel, status="success").inc()
+                logger.info(
+                    "Mock Slack client post message triggered to channel: %s", channel
+                )
+                slack_escalation_delivery_total.labels(
+                    channel=channel, status="success"
+                ).inc()
                 return {"ok": True, "ts": "mock_ts_12345", "channel": channel}
-                
+
             try:
-                response = await self.client.chat_postMessage(
+                response: Any = await self.client.chat_postMessage(
                     channel=channel,
                     blocks=blocks,
-                    text="AI-Powered Incident Escalation Card"
+                    text="AI-Powered Incident Escalation Card",
                 )
-                slack_escalation_delivery_total.labels(channel=channel, status="success").inc()
-                span.set_attribute("slack.message_ts", response.get("ts"))
+                slack_escalation_delivery_total.labels(
+                    channel=channel, status="success"
+                ).inc()
+                span.set_attribute("slack.message_ts", str(response.get("ts") or ""))
                 return response
             except Exception as e:
-                slack_escalation_delivery_total.labels(channel=channel, status="failed").inc()
+                slack_escalation_delivery_total.labels(
+                    channel=channel, status="failed"
+                ).inc()
                 span.record_exception(e)
                 raise e
 
@@ -173,59 +193,79 @@ class SlackClient:
         """
         with tracer.start_as_current_span("slack.post_escalation_card") as span:
             span.set_attribute("incident.id", incident_id)
-            logger.info("Constructing Slack Escalation Card for incident: %s", incident_id)
-            
+            logger.info(
+                "Constructing Slack Escalation Card for incident: %s", incident_id
+            )
+
             # Retrieve incident details
             incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
             if not incident:
-                logger.error("Incident %s not found in Redis. Slack post skipped.", incident_id)
+                logger.error(
+                    "Incident %s not found in Redis. Slack post skipped.", incident_id
+                )
                 span.set_attribute("slack.error", "incident_not_found")
                 return None
-    
+
             # Determine target channel
-            primary_service = incident.services_affected[0] if incident.services_affected else "default"
+            primary_service = (
+                incident.services_affected[0]
+                if incident.services_affected
+                else "default"
+            )
             target_channel = await self.get_routing_channel(primary_service)
-            
+
             # Warning alerts routed to staging channel
             if incident.state == "open" and incident.severity == "warning":
                 target_channel = f"{target_channel}-staging"
-                logger.info("Routing Warning incident %s to staging approval channel: %s", incident_id, target_channel)
-    
+                logger.info(
+                    "Routing Warning incident %s to staging approval channel: %s",
+                    incident_id,
+                    target_channel,
+                )
+
             # Assemble blocks
             blocks = [
                 self.header_block(incident.id, incident.severity),
-                self.context_block(incident.id, incident.created_at, incident.services_affected),
+                self.context_block(
+                    incident.id, incident.created_at, incident.services_affected
+                ),
                 {"type": "divider"},
-                self.hypotheses_block(incident.hypotheses)
+                self.hypotheses_block(incident.hypotheses),
             ]
-            
+
             # Include actions buttons only if not resolved yet
             if incident.state in ["open", "analyzing", "awaiting_approval"]:
                 blocks.append(self.actions_block(incident.id))
-    
+
             try:
                 response = await self.post_message_with_retry(target_channel, blocks)
-                
+
                 # Save timeline action
-                incident.timeline.append(TimelineItem(
-                    timestamp=datetime.now(),
-                    event_type="agent_milestone",
-                    source="system",
-                    message=f"Incident escalation posted to channel {target_channel}.",
-                    severity="info"
-                ))
+                incident.timeline.append(
+                    TimelineItem(
+                        timestamp=datetime.now(),
+                        event_type="agent_milestone",
+                        source="system",
+                        message=f"Incident escalation posted to channel {target_channel}.",
+                        severity="info",
+                    )
+                )
                 await asyncio.to_thread(redis_manager.save_incident, incident)
                 return response
             except Exception as e:
-                logger.error("Failed to post incident escalation card to Slack: %s", str(e))
+                logger.error(
+                    "Failed to post incident escalation card to Slack: %s", str(e)
+                )
                 # Failure fallback node path
-                incident.timeline.append(TimelineItem(
-                    timestamp=datetime.now(),
-                    event_type="escalation_failed",
-                    source="system",
-                    message=f"Escalation notification failed to deliver. Error: {str(e)}",
-                    severity="error"
-                ))
+                incident.timeline.append(
+                    TimelineItem(
+                        timestamp=datetime.now(),
+                        event_type="escalation_failed",
+                        source="system",
+                        message=f"Escalation notification failed to deliver. Error: {str(e)}",
+                        severity="error",
+                    )
+                )
                 await asyncio.to_thread(redis_manager.save_incident, incident)
                 span.record_exception(e)
                 return None
@@ -250,7 +290,11 @@ async def handle_ack_incident(ack, body, client):
     incident_id = body["actions"][0]["value"]
     user_name = body["user"]["name"]
     user_id = body["user"]["id"]
-    logger.info("Slack action: Operator Acknowledge clicked by @%s for incident: %s", user_name, incident_id)
+    logger.info(
+        "Slack action: Operator Acknowledge clicked by @%s for incident: %s",
+        user_name,
+        incident_id,
+    )
 
     # 1. Update state in Redis
     incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
@@ -264,15 +308,17 @@ async def handle_ack_incident(ack, body, client):
             now_dt = datetime.now()
         ack_duration = (now_dt - created_dt).total_seconds()
         operator_acknowledgement_duration_seconds.observe(ack_duration)
-        
+
         incident.state = "analyzing"
-        incident.timeline.append(TimelineItem(
-            timestamp=datetime.now(),
-            event_type="operator_action",
-            source="slack_operator",
-            message=f"Incident acknowledged by @{user_name} ({user_id}) via Slack.",
-            severity="info"
-        ))
+        incident.timeline.append(
+            TimelineItem(
+                timestamp=datetime.now(),
+                event_type="operator_action",
+                source="slack_operator",
+                message=f"Incident acknowledged by @{user_name} ({user_id}) via Slack.",
+                severity="info",
+            )
+        )
         await asyncio.to_thread(redis_manager.save_incident, incident)
 
     # 2. Update the original Slack card (replace actions buttons with ack context block)
@@ -282,16 +328,20 @@ async def handle_ack_incident(ack, body, client):
     blocks = body["message"]["blocks"]
 
     # Reconstruct updated blocks, removing action buttons block
-    updated_blocks = [b for b in blocks if b.get("block_id") != "incident_action_buttons"]
-    updated_blocks.append({
-        "type": "context",
-        "elements": [
-            {
-                "type": "mrkdwn",
-                "text": f"✅ *Acknowledged by @{user_name}* at {datetime.now().strftime('%H:%M:%S')}"
-            }
-        ]
-    })
+    updated_blocks = [
+        b for b in blocks if b.get("block_id") != "incident_action_buttons"
+    ]
+    updated_blocks.append(
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": f"✅ *Acknowledged by @{user_name}* at {datetime.now().strftime('%H:%M:%S')}",
+                }
+            ],
+        }
+    )
 
     # Slack chat.update call
     if settings.SLACK_BOT_TOKEN != "mock_token":
@@ -300,7 +350,7 @@ async def handle_ack_incident(ack, body, client):
                 channel=channel_id,
                 ts=message_ts,
                 blocks=updated_blocks,
-                text="Incident Escalation Card Acknowledged"
+                text="Incident Escalation Card Acknowledged",
             )
         except Exception as e:
             logger.error("Failed to update Slack message card: %s", str(e))
@@ -315,20 +365,26 @@ async def handle_resolve_incident(ack, body, client):
     incident_id = body["actions"][0]["value"]
     user_name = body["user"]["name"]
     user_id = body["user"]["id"]
-    logger.info("Slack action: Operator Resolve clicked by @%s for incident: %s", user_name, incident_id)
+    logger.info(
+        "Slack action: Operator Resolve clicked by @%s for incident: %s",
+        user_name,
+        incident_id,
+    )
 
     try:
         # 1. Update state in Redis
         incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
         if incident:
             incident.state = "resolved"
-            incident.timeline.append(TimelineItem(
-                timestamp=datetime.now(),
-                event_type="operator_action",
-                source="slack_operator",
-                message=f"Incident marked resolved by @{user_name} ({user_id}) via Slack.",
-                severity="info"
-            ))
+            incident.timeline.append(
+                TimelineItem(
+                    timestamp=datetime.now(),
+                    event_type="operator_action",
+                    source="slack_operator",
+                    message=f"Incident marked resolved by @{user_name} ({user_id}) via Slack.",
+                    severity="info",
+                )
+            )
             await asyncio.to_thread(redis_manager.save_incident, incident)
     except Exception as e:
         logger.error("Failed to update incident state in Redis: %s", str(e))
@@ -340,16 +396,20 @@ async def handle_resolve_incident(ack, body, client):
         message_ts = container["message_ts"]
         blocks = body["message"]["blocks"]
 
-        updated_blocks = [b for b in blocks if b.get("block_id") != "incident_action_buttons"]
-        updated_blocks.append({
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": f"🛡️ *Resolved by @{user_name}* at {datetime.now().strftime('%H:%M:%S')}"
-                }
-            ]
-        })
+        updated_blocks = [
+            b for b in blocks if b.get("block_id") != "incident_action_buttons"
+        ]
+        updated_blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🛡️ *Resolved by @{user_name}* at {datetime.now().strftime('%H:%M:%S')}",
+                    }
+                ],
+            }
+        )
     except Exception as e:
         logger.error("Failed to construct updated Blocks for Slack: %s", str(e))
         return
@@ -360,8 +420,7 @@ async def handle_resolve_incident(ack, body, client):
                 channel=channel_id,
                 ts=message_ts,
                 blocks=updated_blocks,
-                text="Incident Escalation Card Resolved"
+                text="Incident Escalation Card Resolved",
             )
         except Exception as e:
             logger.error("Failed to update Slack message card: %s", str(e))
-

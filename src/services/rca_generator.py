@@ -5,12 +5,11 @@ Provides timeline sorting, event aggregation, markdown report rendering,
 optional Groq summary generation, and dual storage persistence (Redis + Local File).
 """
 
-import os
 import json
 import logging
 import asyncio
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import List, Optional
 from pathlib import Path
 
 from src.config import settings
@@ -21,20 +20,11 @@ from src.services.groq_client import groq_client
 logger = logging.getLogger(__name__)
 
 # Severity priority ordering (lowest integer = highest priority)
-SEVERITY_ORDER = {
-    "critical": 0,
-    "error": 1,
-    "warning": 2,
-    "info": 3
-}
+SEVERITY_ORDER = {"critical": 0, "error": 1, "warning": 2, "info": 3}
 
 # Source priority ordering (lowest integer = highest priority)
-SOURCE_ORDER = {
-    "prometheus": 0,
-    "loki": 1,
-    "system": 2,
-    "slack_operator": 3
-}
+SOURCE_ORDER = {"prometheus": 0, "loki": 1, "system": 2, "slack_operator": 3}
+
 
 class RCAGenerator:
     """
@@ -49,10 +39,11 @@ class RCAGenerator:
         2. Severity precedence (critical > error > warning > info)
         3. Source precedence (prometheus > loki > system > slack_operator)
         """
+
         def sort_key(item: TimelineItem):
             sev = item.severity.lower() if item.severity else "info"
             src = item.source.lower() if item.source else "system"
-            
+
             sev_rank = SEVERITY_ORDER.get(sev, 4)
             src_rank = SOURCE_ORDER.get(src, 4)
             return (item.timestamp, sev_rank, src_rank)
@@ -61,11 +52,11 @@ class RCAGenerator:
 
     @classmethod
     async def generate_executive_summary(
-        cls, 
-        incident_id: str, 
-        services: List[str], 
-        timeline: List[TimelineItem], 
-        hypotheses: List[Hypothesis]
+        cls,
+        incident_id: str,
+        services: List[str],
+        timeline: List[TimelineItem],
+        hypotheses: List[Hypothesis],
     ) -> str:
         """
         Queries Groq to write a professional executive summary of the incident.
@@ -73,15 +64,26 @@ class RCAGenerator:
         """
         # Determine if Groq should be called (if API key is default/mock, skip and use fallback)
         if settings.GROQ_API_KEY == "mock_key" or not settings.GROQ_API_KEY:
-            logger.info("Using programmatic fallback executive summary (Groq API key not set).")
+            logger.info(
+                "Using programmatic fallback executive summary (Groq API key not set)."
+            )
             return cls._fallback_summary(incident_id, services, timeline, hypotheses)
 
         # Assemble brief telemetry context for summary generation
         summary_context = {
             "incident_id": incident_id,
             "services_affected": services,
-            "hypotheses": [{"rank": h.rank, "hypothesis": h.hypothesis} for h in hypotheses],
-            "timeline": [{"timestamp": t.timestamp.isoformat(), "source": t.source, "message": t.message} for t in timeline]
+            "hypotheses": [
+                {"rank": h.rank, "hypothesis": h.hypothesis} for h in hypotheses
+            ],
+            "timeline": [
+                {
+                    "timestamp": t.timestamp.isoformat(),
+                    "source": t.source,
+                    "message": t.message,
+                }
+                for t in timeline
+            ],
         }
 
         system_prompt = (
@@ -94,20 +96,22 @@ class RCAGenerator:
 
         try:
             summary = await groq_client.get_reasoning(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
+                system_prompt=system_prompt, user_prompt=user_prompt
             )
             return summary.strip()
         except Exception as e:
-            logger.error("Failed to generate executive summary via Groq: %s. Using fallback.", str(e))
+            logger.error(
+                "Failed to generate executive summary via Groq: %s. Using fallback.",
+                str(e),
+            )
             return cls._fallback_summary(incident_id, services, timeline, hypotheses)
 
     @staticmethod
     def _fallback_summary(
-        incident_id: str, 
-        services: List[str], 
-        timeline: List[TimelineItem], 
-        hypotheses: List[Hypothesis]
+        incident_id: str,
+        services: List[str],
+        timeline: List[TimelineItem],
+        hypotheses: List[Hypothesis],
     ) -> str:
         """
         Programmatic summary helper.
@@ -115,26 +119,23 @@ class RCAGenerator:
         services_str = ", ".join(services) if services else "unknown services"
         detected_at = "unknown time"
         resolved_at = "unknown time"
-        
+
         if timeline:
             sorted_t = sorted(timeline, key=lambda x: x.timestamp)
             detected_at = sorted_t[0].timestamp.strftime("%Y-%m-%d %H:%M:%S")
             resolved_at = sorted_t[-1].timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
         summary = f"Incident {incident_id} affected the service(s): {services_str}. "
-        
+
         if hypotheses:
             summary += f"The primary root cause is hypothesized to be: {hypotheses[0].hypothesis} (confidence: {hypotheses[0].confidence_score:.2f}). "
-        
+
         summary += f"The incident was detected at {detected_at} and resolved at {resolved_at} after operator confirmation."
         return summary
 
     @classmethod
     def render_markdown_report(
-        cls, 
-        incident: IncidentStateModel, 
-        summary: str, 
-        duration_minutes: int
+        cls, incident: IncidentStateModel, summary: str, duration_minutes: int
     ) -> str:
         """
         Compiles incident telemetry, timeline, and hypotheses into a clean Markdown post-mortem document.
@@ -157,16 +158,34 @@ class RCAGenerator:
             for t in sorted_timeline:
                 ts_str = t.timestamp.strftime("%Y-%m-%d %H:%M:%S")
                 msg_text = t.message.replace("|", "\\|")
-                timeline_rows += f"| {ts_str} | {t.source} | {t.severity.upper()} | {msg_text} |\n"
+                timeline_rows += (
+                    f"| {ts_str} | {t.source} | {t.severity.upper()} | {msg_text} |\n"
+                )
         else:
             timeline_rows = "| - | - | - | No timeline events recorded. |\n"
 
         # Define remediation actions
-        remediation_1 = incident.hypotheses[0].recommended_action if len(incident.hypotheses) > 0 else "Verify underlying microservice status."
-        remediation_2 = incident.hypotheses[1].recommended_action if len(incident.hypotheses) > 1 else "Establish additional monitoring metrics alerts."
+        remediation_1 = (
+            incident.hypotheses[0].recommended_action
+            if len(incident.hypotheses) > 0
+            else "Verify underlying microservice status."
+        )
+        remediation_2 = (
+            incident.hypotheses[1].recommended_action
+            if len(incident.hypotheses) > 1
+            else "Establish additional monitoring metrics alerts."
+        )
 
-        detected_at = incident.created_at.strftime("%Y-%m-%d %H:%M:%S") if incident.created_at else "N/A"
-        resolved_at = incident.updated_at.strftime("%Y-%m-%d %H:%M:%S") if incident.updated_at else "N/A"
+        detected_at = (
+            incident.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if incident.created_at
+            else "N/A"
+        )
+        resolved_at = (
+            incident.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if incident.updated_at
+            else "N/A"
+        )
 
         # Compile final template
         report = f"""# Incident Post-Mortem Report (RCA)
@@ -208,7 +227,9 @@ Below is the sequence of events recorded from detection to resolution:
         return report
 
     @classmethod
-    async def resolve_incident(cls, incident_id: str, operator_name: str = "operator") -> Optional[IncidentStateModel]:
+    async def resolve_incident(
+        cls, incident_id: str, operator_name: str = "operator"
+    ) -> Optional[IncidentStateModel]:
         """
         Executes the resolution workflow:
         1. Transitions state to 'resolved' and sets final updated timestamp
@@ -218,8 +239,12 @@ Below is the sequence of events recorded from detection to resolution:
         5. Persists the report to Redis (with a 7-day retention) and local disk
         6. Updates incident's rca_document_url and persists back to Redis
         """
-        logger.info("Executing resolution workflow for incident: %s by %s", incident_id, operator_name)
-        
+        logger.info(
+            "Executing resolution workflow for incident: %s by %s",
+            incident_id,
+            operator_name,
+        )
+
         # 1. Fetch incident from Redis
         incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
         if not incident:
@@ -235,18 +260,22 @@ Below is the sequence of events recorded from detection to resolution:
         resolved_time = datetime.now(incident.created_at.tzinfo)
         incident.state = "resolved"
         incident.updated_at = resolved_time
-        
-        incident.timeline.append(TimelineItem(
-            timestamp=resolved_time,
-            event_type="operator_action",
-            source="slack_operator",
-            message=f"Incident marked resolved by operator '@{operator_name}'.",
-            severity="info",
-            metadata={"operator": operator_name}
-        ))
+
+        incident.timeline.append(
+            TimelineItem(
+                timestamp=resolved_time,
+                event_type="operator_action",
+                source="slack_operator",
+                message=f"Incident marked resolved by operator '@{operator_name}'.",
+                severity="info",
+                metadata={"operator": operator_name},
+            )
+        )
 
         # 3. Calculate duration (in minutes)
-        duration_minutes = int((resolved_time - incident.created_at).total_seconds() / 60)
+        duration_minutes = int(
+            (resolved_time - incident.created_at).total_seconds() / 60
+        )
         if duration_minutes < 0:
             duration_minutes = 0
 
@@ -258,11 +287,13 @@ Below is the sequence of events recorded from detection to resolution:
             incident_id=incident.id,
             services=incident.services_affected,
             timeline=sorted_timeline,
-            hypotheses=incident.hypotheses
+            hypotheses=incident.hypotheses,
         )
 
         # 6. Render markdown document
-        markdown_content = cls.render_markdown_report(incident, summary, duration_minutes)
+        markdown_content = cls.render_markdown_report(
+            incident, summary, duration_minutes
+        )
 
         # 7. Persist RCA (Redis + Local filesystem)
         rca_payload = {
@@ -270,7 +301,7 @@ Below is the sequence of events recorded from detection to resolution:
             "title": f"Incident Post-Mortem Report (RCA) - {incident.id}",
             "markdown_content": markdown_content,
             "resolved_at": resolved_time.isoformat(),
-            "last_updated_at": resolved_time.isoformat()
+            "last_updated_at": resolved_time.isoformat(),
         }
 
         # Save to Redis with 7-day TTL (604800 seconds)
@@ -285,9 +316,11 @@ Below is the sequence of events recorded from detection to resolution:
         local_dir = Path("storage/rcas")
         local_dir.mkdir(parents=True, exist_ok=True)
         local_path = local_dir / f"{incident.id}.md"
-        
+
         try:
-            await asyncio.to_thread(local_path.write_text, markdown_content, encoding="utf-8")
+            await asyncio.to_thread(
+                local_path.write_text, markdown_content, encoding="utf-8"
+            )
             logger.info("RCA successfully written to local disk: %s", local_path)
         except Exception as e:
             logger.error("Failed to write RCA file to disk: %s", str(e))

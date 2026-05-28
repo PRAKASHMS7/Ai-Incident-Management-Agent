@@ -1,6 +1,6 @@
-import pytest
 from src.core.chaos import ChaosFaultManager, ChaosScenarioRunner, RCAValidator
 from src.observability.metrics import fallback_diagnostics_total
+
 
 def test_chaos_fault_manager_mock():
     """
@@ -15,6 +15,7 @@ def test_chaos_fault_manager_mock():
     manager.remove_packet_loss("test-container")
     manager.pause_container("test-container")
     manager.unpause_container("test-container")
+
 
 def test_chaos_scenario_runner():
     """
@@ -52,6 +53,7 @@ def test_chaos_scenario_runner():
     assert res5["scenario"] == "CF-05"
     assert res5["status"] == "passed"
 
+
 def test_rca_accuracy_validator():
     """
     Verifies that RCAValidator accurately asserts generated hypotheses.
@@ -63,7 +65,7 @@ def test_rca_accuracy_validator():
                 "hypothesis": "Database connection pool exhaustion on payment-service-db.",
                 "confidence_score": 0.85,
                 "evidence": ["Connection pool timeouts in Loki exceptions logs"],
-                "recommended_action": "Check connection parameters"
+                "recommended_action": "Check connection parameters",
             }
         ]
     }
@@ -72,7 +74,7 @@ def test_rca_accuracy_validator():
     res = RCAValidator.validate_rca_accuracy(
         generated_rca=valid_rca,
         expected_root_cause="pool exhaustion",
-        min_confidence=0.80
+        min_confidence=0.80,
     )
     assert res["valid"] is True
     assert res["details"]["cause_matched"] is True
@@ -83,7 +85,7 @@ def test_rca_accuracy_validator():
     res_low_conf = RCAValidator.validate_rca_accuracy(
         generated_rca=valid_rca,
         expected_root_cause="pool exhaustion",
-        min_confidence=0.90
+        min_confidence=0.90,
     )
     assert res_low_conf["valid"] is False
     assert res_low_conf["details"]["confidence_passed"] is False
@@ -92,7 +94,7 @@ def test_rca_accuracy_validator():
     res_mismatch = RCAValidator.validate_rca_accuracy(
         generated_rca=valid_rca,
         expected_root_cause="cpu saturation",
-        min_confidence=0.80
+        min_confidence=0.80,
     )
     assert res_mismatch["valid"] is False
     assert res_mismatch["details"]["cause_matched"] is False

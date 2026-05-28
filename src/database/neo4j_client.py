@@ -38,6 +38,7 @@ class Neo4jClientManager:
     """
     Manages the lifecycle, health, indexes, and write/read operations of the Neo4j driver connection.
     """
+
     def __init__(self) -> None:
         self.uri: str = settings.NEO4J_URI
         self.user: str = settings.NEO4J_USER
@@ -49,13 +50,15 @@ class Neo4jClientManager:
         Initializes and returns the Neo4j Driver instance.
         """
         if self._driver is None:
-            logger.info("Initializing Neo4j Bolt driver to %s as user '%s'", self.uri, self.user)
+            logger.info(
+                "Initializing Neo4j Bolt driver to %s as user '%s'", self.uri, self.user
+            )
             self._driver = GraphDatabase.driver(
                 self.uri,
                 auth=(self.user, self.password),
                 max_connection_lifetime=30 * 60,
                 max_connection_pool_size=50,
-                connection_timeout=5.0
+                connection_timeout=5.0,
             )
         return self._driver
 
@@ -76,14 +79,25 @@ class Neo4jClientManager:
             driver = self.get_driver()
             with driver.session() as session:
                 logger.info("Setting up Neo4j schema constraints and indexes...")
-                session.run("CREATE CONSTRAINT unique_service_name IF NOT EXISTS FOR (s:Service) REQUIRE s.name IS UNIQUE;")
-                session.run("CREATE CONSTRAINT unique_db_name IF NOT EXISTS FOR (d:Database) REQUIRE d.name IS UNIQUE;")
-                session.run("CREATE INDEX service_lookup_idx IF NOT EXISTS FOR (s:Service) ON (s.name);")
+                session.run(
+                    "CREATE CONSTRAINT unique_service_name IF NOT EXISTS FOR (s:Service) REQUIRE s.name IS UNIQUE;"
+                )
+                session.run(
+                    "CREATE CONSTRAINT unique_db_name IF NOT EXISTS FOR (d:Database) REQUIRE d.name IS UNIQUE;"
+                )
+                session.run(
+                    "CREATE INDEX service_lookup_idx IF NOT EXISTS FOR (s:Service) ON (s.name);"
+                )
                 logger.info("Neo4j database schema initialization complete.")
         except Exception as e:
-            logger.warning("Could not set up Neo4j constraints/indexes (degraded fallback model active): %s", str(e))
+            logger.warning(
+                "Could not set up Neo4j constraints/indexes (degraded fallback model active): %s",
+                str(e),
+            )
 
-    def create_service_node(self, name: str, language: str = "python", version: str = "latest") -> None:
+    def create_service_node(
+        self, name: str, language: str = "python", version: str = "latest"
+    ) -> None:
         """
         UPSERTs a Service node in the Neo4j dependency graph.
         """
@@ -139,7 +153,13 @@ class Neo4jClientManager:
                 span.record_exception(e)
                 raise e
 
-    def create_dependency(self, source: str, target: str, protocol: str = "http", p99_latency_threshold_ms: int = 200) -> None:
+    def create_dependency(
+        self,
+        source: str,
+        target: str,
+        protocol: str = "http",
+        p99_latency_threshold_ms: int = 200,
+    ) -> None:
         """
         Establishes a DEPENDS_ON relationship between source and target nodes.
         Uses label-specific indexes for source and target lookups.
@@ -173,10 +193,25 @@ class Neo4jClientManager:
                   r.updated_at = datetime()
                 """
                 with driver.session() as session:
-                    session.run(query, source=source, target=target, protocol=protocol, p99=p99_latency_threshold_ms)
-                    logger.info("Established Neo4j dependency relation: %s -> %s", source, target)
+                    session.run(
+                        query,
+                        source=source,
+                        target=target,
+                        protocol=protocol,
+                        p99=p99_latency_threshold_ms,
+                    )
+                    logger.info(
+                        "Established Neo4j dependency relation: %s -> %s",
+                        source,
+                        target,
+                    )
             except Exception as e:
-                logger.error("Failed to create dependency relation %s -> %s: %s", source, target, str(e))
+                logger.error(
+                    "Failed to create dependency relation %s -> %s: %s",
+                    source,
+                    target,
+                    str(e),
+                )
                 span.record_exception(e)
                 raise e
 
@@ -199,8 +234,10 @@ class Neo4jClientManager:
                     return json.loads(cached_val)
                 span.set_attribute("redis.cache_hit", False)
             except Exception as e:
-                logger.warning("Failed to query Redis cache for Neo4j upstreams: %s", str(e))
-    
+                logger.warning(
+                    "Failed to query Redis cache for Neo4j upstreams: %s", str(e)
+                )
+
             try:
                 driver = self.get_driver()
                 query = """
@@ -214,16 +251,20 @@ class Neo4jClientManager:
                 with driver.session() as session:
                     result = session.run(query, name=name)
                     upstreams = [record["name"] for record in result]
-                    
+
                 try:
                     redis_client = redis_manager.get_client()
                     redis_client.set(cache_key, json.dumps(upstreams), ex=300)
                 except Exception as e:
-                    logger.warning("Failed to write Neo4j upstreams to cache: %s", str(e))
-                    
+                    logger.warning(
+                        "Failed to write Neo4j upstreams to cache: %s", str(e)
+                    )
+
                 return upstreams
             except Exception as e:
-                logger.error("Failed to retrieve upstream dependencies for %s: %s", name, str(e))
+                logger.error(
+                    "Failed to retrieve upstream dependencies for %s: %s", name, str(e)
+                )
                 span.record_exception(e)
                 return []
 
@@ -246,8 +287,10 @@ class Neo4jClientManager:
                     return json.loads(cached_val)
                 span.set_attribute("redis.cache_hit", False)
             except Exception as e:
-                logger.warning("Failed to query Redis cache for Neo4j downstreams: %s", str(e))
-    
+                logger.warning(
+                    "Failed to query Redis cache for Neo4j downstreams: %s", str(e)
+                )
+
             try:
                 driver = self.get_driver()
                 query = """
@@ -260,17 +303,26 @@ class Neo4jClientManager:
                 """
                 with driver.session() as session:
                     result = session.run(query, name=name)
-                    downstreams = [{"type": record["type"], "name": record["name"]} for record in result]
-                    
+                    downstreams = [
+                        {"type": record["type"], "name": record["name"]}
+                        for record in result
+                    ]
+
                 try:
                     redis_client = redis_manager.get_client()
                     redis_client.set(cache_key, json.dumps(downstreams), ex=300)
                 except Exception as e:
-                    logger.warning("Failed to write Neo4j downstreams to cache: %s", str(e))
-                    
+                    logger.warning(
+                        "Failed to write Neo4j downstreams to cache: %s", str(e)
+                    )
+
                 return downstreams
             except Exception as e:
-                logger.error("Failed to retrieve downstream dependencies for %s: %s", name, str(e))
+                logger.error(
+                    "Failed to retrieve downstream dependencies for %s: %s",
+                    name,
+                    str(e),
+                )
                 span.record_exception(e)
                 return []
 
@@ -285,29 +337,41 @@ class Neo4jClientManager:
                 driver = self.get_driver()
                 nodes = []
                 edges = []
-                
+
                 with driver.session() as session:
                     # Query all nodes
-                    nodes_res = session.run("MATCH (n) RETURN labels(n)[0] AS type, properties(n) AS props")
+                    nodes_res = session.run(
+                        "MATCH (n) RETURN labels(n)[0] AS type, properties(n) AS props"
+                    )
                     for r in nodes_res:
                         props = r["props"]
                         converted_props = _convert_neo4j_datetime(props)
-                        nodes.append({
-                            "id": converted_props.get("name"),
-                            "label": r["type"],
-                            "properties": {k: v for k, v in converted_props.items() if k != "name"}
-                        })
-                    
+                        nodes.append(
+                            {
+                                "id": converted_props.get("name"),
+                                "label": r["type"],
+                                "properties": {
+                                    k: v
+                                    for k, v in converted_props.items()
+                                    if k != "name"
+                                },
+                            }
+                        )
+
                     # Query all dependency relations
-                    edges_res = session.run("MATCH (n1)-[r:DEPENDS_ON]->(n2) RETURN n1.name AS source, n2.name AS target, properties(r) AS props")
+                    edges_res = session.run(
+                        "MATCH (n1)-[r:DEPENDS_ON]->(n2) RETURN n1.name AS source, n2.name AS target, properties(r) AS props"
+                    )
                     for r in edges_res:
                         converted_edge_props = _convert_neo4j_datetime(r["props"])
-                        edges.append({
-                            "source": r["source"],
-                            "target": r["target"],
-                            "properties": converted_edge_props
-                        })
-                        
+                        edges.append(
+                            {
+                                "source": r["source"],
+                                "target": r["target"],
+                                "properties": converted_edge_props,
+                            }
+                        )
+
                 return {"nodes": nodes, "edges": edges}
             except Exception as e:
                 logger.error("Failed to retrieve full database graph: %s", str(e))
@@ -324,7 +388,7 @@ class Neo4jClientManager:
             try:
                 driver = self.get_driver()
                 driver.verify_connectivity()
-                
+
                 with driver.session() as session:
                     result = session.run("RETURN 1 AS check")
                     record = result.single()
@@ -335,33 +399,41 @@ class Neo4jClientManager:
                                 "uri": self.uri,
                                 "user": self.user,
                                 "connection": "verified",
-                                "query_test": "passed"
-                            }
+                                "query_test": "passed",
+                            },
                         }
                 return {
                     "status": "unhealthy",
-                    "details": "Test query executed but failed to return expected value."
+                    "details": "Test query executed but failed to return expected value.",
                 }
             except Neo4jError as e:
-                logger.error("Neo4j database error during health check: %s", str(e), exc_info=True)
+                logger.error(
+                    "Neo4j database error during health check: %s",
+                    str(e),
+                    exc_info=True,
+                )
                 span.record_exception(e)
                 return {
                     "status": "unhealthy",
-                    "details": f"Database query failed: {str(e)}"
+                    "details": f"Database query failed: {str(e)}",
                 }
             except Exception as e:
-                logger.error("Unexpected exception during Neo4j health check: %s", str(e), exc_info=True)
+                logger.error(
+                    "Unexpected exception during Neo4j health check: %s",
+                    str(e),
+                    exc_info=True,
+                )
                 span.record_exception(e)
                 return {
                     "status": "unhealthy",
-                    "details": f"Connection failed: {str(e)}"
+                    "details": f"Connection failed: {str(e)}",
                 }
 
     def check_dependency_path(self, service_a: str, services_list: List[str]) -> bool:
         """
         Queries Neo4j to find if there is a dependency path (depth 1 or 2)
         between service_a and any service in services_list.
-        
+
         Uses Redis to cache query results for 5 minutes (300 seconds).
         Degrades gracefully by returning False and logging a warning if Neo4j is down.
         """
@@ -370,27 +442,33 @@ class Neo4jClientManager:
             span.set_attribute("db.operation", "check_dependency_path")
             span.set_attribute("neo4j.service_a", service_a)
             span.set_attribute("neo4j.services_list", services_list)
-            
+
             if not services_list:
                 return False
-                
+
             # Create deterministic cache key
             sorted_services = sorted(services_list)
             services_str = ",".join(sorted_services)
             cache_key = f"cache:neo4j:{service_a}:{services_str}"
-            
+
             # 1. Attempt to fetch from Redis Cache
             try:
                 redis_client = redis_manager.get_client()
                 cached_val = redis_client.get(cache_key)
                 if cached_val is not None:
-                    logger.debug("Neo4j path search cache hit for %s -> %s", service_a, services_str)
+                    logger.debug(
+                        "Neo4j path search cache hit for %s -> %s",
+                        service_a,
+                        services_str,
+                    )
                     span.set_attribute("redis.cache_hit", True)
                     return cached_val == "1"
                 span.set_attribute("redis.cache_hit", False)
             except Exception as e:
-                logger.warning("Failed to query Redis cache for Neo4j path search: %s", str(e))
-    
+                logger.warning(
+                    "Failed to query Redis cache for Neo4j path search: %s", str(e)
+                )
+
             # 2. Query Neo4j on Cache Miss
             try:
                 driver = self.get_driver()
@@ -401,26 +479,31 @@ class Neo4jClientManager:
                 """
                 connected = False
                 with driver.session() as session:
-                    result = session.run(query, service_a=service_a, services_list=services_list)
+                    result = session.run(
+                        query, service_a=service_a, services_list=services_list
+                    )
                     record = result.single()
                     if record:
                         connected = bool(record["connected"])
-                
+
                 # 3. Store result in Redis Cache (5-minute TTL)
                 try:
                     redis_client = redis_manager.get_client()
                     redis_client.set(cache_key, "1" if connected else "0", ex=300)
                 except Exception as e:
-                    logger.warning("Failed to write Neo4j path search to cache: %s", str(e))
-                    
+                    logger.warning(
+                        "Failed to write Neo4j path search to cache: %s", str(e)
+                    )
+
                 return connected
             except Exception as e:
                 logger.warning(
                     "Neo4j path search failed or database is offline. Falling back to default correlation. Error: %s",
-                    str(e)
+                    str(e),
                 )
                 span.record_exception(e)
                 return False
+
 
 # Global singleton client manager
 neo4j_manager = Neo4jClientManager()
