@@ -57,10 +57,8 @@ def test_health_endpoints_health_checks():
 
 def test_deployment_env_profiles_exist():
     """
-    Asserts that environment profile files exist in the workspace.
+    Asserts that environment profile templates exist in the workspace.
     """
-    assert os.path.exists(".env.dev")
-    assert os.path.exists(".env.test")
-    assert os.path.exists(".env.prod")
+    assert os.path.exists(".env.example")
     assert os.path.exists("docker-compose.prod.yml")
     assert os.path.exists("nginx.prod.conf")
