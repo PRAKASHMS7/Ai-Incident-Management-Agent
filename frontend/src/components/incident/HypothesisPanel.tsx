@@ -1,6 +1,6 @@
 import React from 'react';
 import { Hypothesis } from '../../api/types';
-import { ShieldCheck, BookOpen, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, BookOpen } from 'lucide-react';
 
 interface HypothesisPanelProps {
   hypotheses: Hypothesis[];

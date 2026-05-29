@@ -1,6 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { SeverityBadge } from '../../components/dashboard/SeverityBadge';
 import { IncidentCard } from '../../components/dashboard/IncidentCard';

@@ -125,10 +125,11 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({ affectedServic
           edges: {
             width: 1.5,
             smooth: {
+              enabled: true,
               type: 'cubicBezier',
               forceDirection: 'none',
-              roundness: 0.5
-            }
+              roundness: 0.5,
+            },
           }
         };
 

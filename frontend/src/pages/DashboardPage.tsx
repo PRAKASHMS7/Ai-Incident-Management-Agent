@@ -3,7 +3,6 @@ import { useIncidentStore, usePolling } from '../api/client';
 import { IncidentCard } from '../components/dashboard/IncidentCard';
 import { IncidentTable } from '../components/dashboard/IncidentTable';
 import { Search, SlidersHorizontal, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
-import { Spinner } from '../components/ui/Spinner';
 
 export const DashboardPage: React.FC = () => {
   const { incidents, fetchIncidents, resolveIncident, fetchSystemHealth, error } = useIncidentStore();

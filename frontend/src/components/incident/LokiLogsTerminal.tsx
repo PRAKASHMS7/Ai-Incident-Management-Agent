@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Terminal, Search, Filter } from 'lucide-react';
+import { Terminal, Search } from 'lucide-react';
 
 interface LokiLogsTerminalProps {
   service: string;

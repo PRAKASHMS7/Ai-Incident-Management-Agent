@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useIncidentStore, usePolling } from '../api/client';
 import { RCAEditor } from '../components/incident/RCAEditor';
-import { BookOpen, Calendar, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronRight } from 'lucide-react';
 
 export const RcaViewerPage: React.FC = () => {
   const { incidents, fetchIncidents } = useIncidentStore();

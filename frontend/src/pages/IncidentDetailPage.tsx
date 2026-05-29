@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useIncidentStore, usePolling } from '../api/client';
 import { TelemetryGraphs } from '../components/incident/TelemetryGraphs';

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { create } from 'zustand';
 import { useEffect, useRef } from 'react';
-import { IncidentStateModel, RcaReport, SystemHealth, TimelineItem } from './types';
+import { IncidentStateModel, SystemHealth } from './types';
 
 // Detect host for cross-origin API routing fallback
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 

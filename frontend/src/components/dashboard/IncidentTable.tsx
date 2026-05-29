@@ -57,7 +57,6 @@ export const IncidentTable: React.FC<IncidentTableProps> = ({ incidents, onResol
             ) : (
               incidents.map((inc) => {
                 const formattedDate = new Date(inc.created_at).toLocaleString();
-                const isCritical = inc.severity.toLowerCase() === 'critical';
                 const isOpen = inc.state !== 'resolved';
                 
                 return (

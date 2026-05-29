@@ -1,7 +1,7 @@
 import React from 'react';
 import { useIncidentStore, usePolling } from '../api/client';
 import { HealthMetricsPanel } from '../components/health/HealthMetricsPanel';
-import { Heart, Activity, CheckCircle2, AlertTriangle, Cpu } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export const AgentHealthPage: React.FC = () => {
   const { systemHealth, fetchSystemHealth } = useIncidentStore();
