@@ -24,13 +24,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -g 10001 appgroup && \
     useradd -u 10001 -g appgroup -d /app -s /sbin/nologin appuser
 
+# Pre-create storage directory and assign ownership to appuser
+RUN mkdir -p /app/storage/rcas && \
+    chown -R appuser:appgroup /app/storage
+
 # Copy dependencies installed in user site directory
-COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appgroup --from=builder /root/.local /app/.local
 COPY --chown=appuser:appgroup src/ ./src
 COPY --chown=appuser:appgroup scripts/ ./scripts
 
 # Ensure paths and environment variables are set correctly
-ENV PATH=/home/appuser/.local/bin:$PATH
+ENV PATH=/app/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 
 # Expose port
