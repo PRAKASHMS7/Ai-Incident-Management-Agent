@@ -179,3 +179,10 @@ class LogQueryResponse(BaseModel):
 
     status: str
     logs: List[LogLine] = Field(default_factory=list)
+
+
+class RcaUpdatePayload(BaseModel):
+    """Payload to update an existing RCA post-mortem report."""
+
+    markdown_content: str
+

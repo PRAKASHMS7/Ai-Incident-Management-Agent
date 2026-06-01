@@ -53,9 +53,15 @@ class CorrelationEngine:
             # 2. Check each active incident for matches
             for incident in active_incidents:
                 # A. Time window check (sliding window from last update time)
-                time_delta = abs(
-                    (alert.starts_at - incident.updated_at).total_seconds()
-                )
+                alert_ts = alert.starts_at
+                if alert_ts.tzinfo is not None:
+                    alert_ts = alert_ts.replace(tzinfo=None)
+                
+                incident_ts = incident.updated_at
+                if incident_ts.tzinfo is not None:
+                    incident_ts = incident_ts.replace(tzinfo=None)
+
+                time_delta = abs((alert_ts - incident_ts).total_seconds())
                 if time_delta > CORRELATION_WINDOW_SECONDS:
                     continue
 
@@ -185,10 +191,18 @@ class CorrelationEngine:
         incident.timeline.append(timeline_item)
 
         # Sort timeline chronologically
-        incident.timeline.sort(key=lambda x: x.timestamp)
+        incident.timeline.sort(key=lambda x: x.timestamp.replace(tzinfo=None) if x.timestamp.tzinfo is not None else x.timestamp)
 
         # Update updated_at
-        incident.updated_at = max(alert.starts_at, incident.updated_at)
+        alert_ts = alert.starts_at
+        if alert_ts.tzinfo is not None:
+            alert_ts = alert_ts.replace(tzinfo=None)
+            
+        incident_ts = incident.updated_at
+        if incident_ts.tzinfo is not None:
+            incident_ts = incident_ts.replace(tzinfo=None)
+
+        incident.updated_at = max(alert_ts, incident_ts)
 
     @staticmethod
     def _merge_multiple_incidents(
@@ -247,7 +261,7 @@ class CorrelationEngine:
             redis_manager.save_incident(secondary)  # Removing from active sets
 
         # Sort primary timeline chronologically
-        primary.timeline.sort(key=lambda x: x.timestamp)
+        primary.timeline.sort(key=lambda x: x.timestamp.replace(tzinfo=None) if x.timestamp.tzinfo is not None else x.timestamp)
 
         # Update primary severity based on all alerts
         severity_ranking = {"info": 1, "warning": 2, "critical": 3}

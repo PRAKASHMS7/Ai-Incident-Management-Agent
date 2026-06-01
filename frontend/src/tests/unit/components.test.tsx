@@ -5,6 +5,7 @@ import { SeverityBadge } from '../../components/dashboard/SeverityBadge';
 import { IncidentCard } from '../../components/dashboard/IncidentCard';
 import { IncidentTable } from '../../components/dashboard/IncidentTable';
 import { IncidentStateModel } from '../../api/types';
+import { TimelineViewer } from '../../components/incident/TimelineViewer';
 
 // Mock react-router-dom useNavigate
 const mockNavigate = vi.fn();
@@ -105,5 +106,25 @@ describe('IncidentTable Component', () => {
     const btn = screen.getByText('Resolve');
     fireEvent.click(btn);
     expect(mockResolve).toHaveBeenCalledWith('inc-test-uuid-12345');
+  });
+});
+
+describe('TimelineViewer Component', () => {
+  test('renders timeline event timestamps in correct IST format', () => {
+    const mockTimeline = [
+      {
+        timestamp: '2026-05-30T16:07:12Z',
+        event_type: 'alert_triggered',
+        source: 'prometheus',
+        message: 'High CPU utilization detected on database node.',
+        severity: 'critical',
+        metadata: {}
+      }
+    ];
+
+    render(<TimelineViewer timeline={mockTimeline} />);
+    
+    // We expect "30 May 2026, 09:37:12 PM IST" to be displayed in the document
+    expect(screen.getByText(/30 May 2026, 09:37:12 PM IST/)).toBeInTheDocument();
   });
 });

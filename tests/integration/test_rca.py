@@ -212,3 +212,33 @@ def test_resolve_incident_groq_fallback(mock_redis_db, create_incident, client):
         local_path = Path("storage/rcas") / "inc-groq-fail.md"
         if local_path.exists():
             local_path.unlink()
+
+
+def test_update_rca_report(mock_redis_db, create_incident, client):
+    """
+    PUT /rca/{id} updates the Markdown content in Redis and on disk.
+    """
+    create_incident("inc-update-test")
+    # Resolve first to generate reports
+    res = client.post("/incidents/inc-update-test/resolve")
+    assert res.status_code == 200
+
+    new_content = "# Updated Incident Post-Mortem Report\nModified content by operator."
+    response = client.put("/rca/inc-update-test", json={"markdown_content": new_content})
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+
+    # Verify disk persistence
+    local_path = Path("storage/rcas") / "inc-update-test.md"
+    assert local_path.exists()
+    assert local_path.read_text(encoding="utf-8") == new_content
+
+    # Verify Redis cache update
+    response_md = client.get("/rca/inc-update-test")
+    assert response_md.status_code == 200
+    assert response_md.text == new_content
+
+    # Cleanup
+    if local_path.exists():
+        local_path.unlink()
+

@@ -7,7 +7,8 @@ tenacity-protected Web API postings, and incident state synchronization.
 
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Dict, Any, List, Optional
 import slack_sdk
 from slack_bolt.async_app import AsyncApp
@@ -63,12 +64,22 @@ class SlackClient:
     def context_block(
         incident_id: str, timestamp: datetime, services: List[str]
     ) -> Dict[str, Any]:
+        dt = timestamp
+        if isinstance(dt, str):
+            try:
+                dt = datetime.fromisoformat(dt)
+            except ValueError:
+                dt = datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        ist_time = dt.astimezone(ZoneInfo("Asia/Kolkata"))
+        formatted_time = ist_time.strftime("%d %b %Y, %I:%M:%S %p IST")
         return {
             "type": "context",
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Incident ID:* `{incident_id}` | *Triggered:* `{timestamp.strftime('%Y-%m-%d %H:%M:%S')}` | *Services Affected:* `{', '.join(services)}`",
+                    "text": f"*Incident ID:* `{incident_id}` | *Triggered:* `{formatted_time}` | *Services Affected:* `{', '.join(services)}`",
                 }
             ],
         }
@@ -243,7 +254,7 @@ class SlackClient:
                 # Save timeline action
                 incident.timeline.append(
                     TimelineItem(
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                         event_type="agent_milestone",
                         source="system",
                         message=f"Incident escalation posted to channel {target_channel}.",
@@ -259,7 +270,7 @@ class SlackClient:
                 # Failure fallback node path
                 incident.timeline.append(
                     TimelineItem(
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                         event_type="escalation_failed",
                         source="system",
                         message=f"Escalation notification failed to deliver. Error: {str(e)}",
@@ -312,7 +323,7 @@ async def handle_ack_incident(ack, body, client):
         incident.state = "analyzing"
         incident.timeline.append(
             TimelineItem(
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 event_type="operator_action",
                 source="slack_operator",
                 message=f"Incident acknowledged by @{user_name} ({user_id}) via Slack.",
@@ -337,7 +348,7 @@ async def handle_ack_incident(ack, body, client):
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"✅ *Acknowledged by @{user_name}* at {datetime.now().strftime('%H:%M:%S')}",
+                    "text": f"✅ *Acknowledged by @{user_name}* at {datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')}",
                 }
             ],
         }
@@ -405,7 +416,7 @@ async def handle_resolve_incident(ack, body, client):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"🛡️ *Resolved by @{user_name}* at {datetime.now().strftime('%H:%M:%S')}",
+                        "text": f"🛡️ *Resolved by @{user_name}* at {datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')}",
                     }
                 ],
             }

@@ -58,33 +58,41 @@ export const RCAEditor: React.FC<RCAEditorProps> = ({ incidentId }) => {
     window.open(`${api.defaults.baseURL || ''}/rca/${incidentId}/export`, '_blank');
   };
 
-  const handleToggleCheck = (id: number) => {
-    setActionItems((items) =>
-      items.map((item) => {
-        if (item.id === id) {
-          const updatedVal = !item.completed;
-          
-          // Re-build markdown content representing the updated checkbox state
-          let currentMd = isEditing ? editedMarkdown : markdown;
-          const escapedText = item.text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-          const regex = new RegExp(`(-\\s+\\[[x\\s ]\\]\\s+)(${escapedText})`, 'i');
-          const replacement = ` - [${updatedVal ? 'x' : ' '}] ${item.text}`;
-          const updatedMd = currentMd.replace(regex, replacement);
-          
-          setMarkdown(updatedMd);
-          setEditedMarkdown(updatedMd);
-          return { ...item, completed: updatedVal };
-        }
-        return item;
-      })
-    );
+  const handleToggleCheck = async (id: number) => {
+    let updatedMd = '';
+    const newItems = actionItems.map((item) => {
+      if (item.id === id) {
+        const updatedVal = !item.completed;
+        let currentMd = isEditing ? editedMarkdown : markdown;
+        const escapedText = item.text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`(-\\s+\\[[x\\s ]\\]\\s+)(${escapedText})`, 'i');
+        const replacement = ` - [${updatedVal ? 'x' : ' '}] ${item.text}`;
+        updatedMd = currentMd.replace(regex, replacement);
+        return { ...item, completed: updatedVal };
+      }
+      return item;
+    });
+
+    if (updatedMd) {
+      setMarkdown(updatedMd);
+      setEditedMarkdown(updatedMd);
+      setActionItems(newItems);
+      try {
+        await api.put(`/rca/${incidentId}`, { markdown_content: updatedMd });
+      } catch (err: any) {
+        console.error('Failed to save checklist state:', err);
+      }
+    }
   };
 
-  const handleSave = () => {
-    setMarkdown(editedMarkdown);
-    setIsEditing(false);
-    // Simulating PUT/POST save. In production, we would call a save endpoint like PUT /rca/{id}
-    alert('RCA changes saved locally.');
+  const handleSave = async () => {
+    try {
+      await api.put(`/rca/${incidentId}`, { markdown_content: editedMarkdown });
+      setMarkdown(editedMarkdown);
+      setIsEditing(false);
+    } catch (err: any) {
+      alert('Failed to save RCA edits: ' + (err.response?.data?.detail || err.message));
+    }
   };
 
   if (loading) {

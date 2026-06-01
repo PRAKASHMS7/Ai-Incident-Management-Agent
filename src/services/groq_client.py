@@ -77,7 +77,7 @@ class GroqClient:
         self,
         system_prompt: str,
         user_prompt: str,
-        model: str = "llama3-70b-8192",
+        model: str = "llama-3.3-70b-versatile",
         temperature: float = 0.1,
     ) -> str:
         """

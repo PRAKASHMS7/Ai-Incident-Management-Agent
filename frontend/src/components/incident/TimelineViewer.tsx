@@ -48,7 +48,16 @@ export const TimelineViewer: React.FC<TimelineViewerProps> = ({ timeline }) => {
   return (
     <div className="relative pl-6 border-l-2 border-slate-800 flex flex-col gap-6 py-2">
       {timeline.map((item, idx) => {
-        const date = new Date(item.timestamp).toLocaleTimeString();
+        const date = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        }).format(new Date(item.timestamp)).replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()) + ' IST';
         const formattedType = item.event_type.replace('_', ' ');
 
         return (

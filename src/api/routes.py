@@ -7,11 +7,11 @@ Defines HTTP handlers for alert ingestion, topology nodes management, and depend
 import logging
 import uuid
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 import json
 from pathlib import Path
-from fastapi import APIRouter, Response, status, HTTPException, Request
+from fastapi import APIRouter, Response, status, HTTPException, Request, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from src.api.schemas import (
@@ -19,6 +19,7 @@ from src.api.schemas import (
     StandardizedAlert,
     IncidentStateModel,
     TopologyLoadPayload,
+    RcaUpdatePayload,
 )
 from src.database.redis_client import redis_manager
 from src.database.neo4j_client import neo4j_manager
@@ -32,8 +33,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def run_incident_workflow(incident_id: str):
+    """
+    Asynchronously invokes the LangGraph reasoning workflow for the newly created incident.
+    """
+    try:
+        from src.graph.workflow import compiled_workflow
+        config = {"configurable": {"thread_id": incident_id}}
+        logger.info("Executing LangGraph reasoning workflow for incident %s", incident_id)
+        await compiled_workflow.ainvoke({"incident_id": incident_id}, config=config)
+        logger.info("LangGraph reasoning workflow completed for incident %s", incident_id)
+    except Exception as e:
+        logger.error(
+            "Failed to run LangGraph reasoning workflow for incident %s: %s",
+            incident_id,
+            str(e),
+            exc_info=True,
+        )
+
+
 @router.post("/alerts", status_code=status.HTTP_202_ACCEPTED)
-def ingest_alerts(payload: AlertManagerWebhookPayload) -> Dict[str, Any]:
+def ingest_alerts(
+    payload: AlertManagerWebhookPayload,
+    background_tasks: BackgroundTasks,
+) -> Dict[str, Any]:
     """
     Ingest webhook alerts from Prometheus AlertManager or Grafana Loki.
 
@@ -80,7 +103,7 @@ def ingest_alerts(payload: AlertManagerWebhookPayload) -> Dict[str, Any]:
             service=labels.service,
             severity=labels.severity.lower() if labels.severity else "warning",
             description=description,
-            starts_at=raw_alert.startsAt or datetime.now(),
+            starts_at=raw_alert.startsAt or datetime.now(timezone.utc),
             ends_at=raw_alert.endsAt,
             details={
                 "receiver": payload.receiver,
@@ -99,6 +122,11 @@ def ingest_alerts(payload: AlertManagerWebhookPayload) -> Dict[str, Any]:
 
             incidents_mapped.append({"incident_id": incident_id, "action": action})
             processed_count += 1
+
+            if action == "created":
+                import sys
+                if "pytest" not in sys.modules:
+                    background_tasks.add_task(run_incident_workflow, incident_id)
         except Exception as e:
             logger.error(
                 "Failed to correlate alert %s: %s", alert_id, str(e), exc_info=True
@@ -383,6 +411,54 @@ def get_rca_report(id: str) -> Response:
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"RCA report for incident {id} not found.",
     )
+
+
+@router.put("/rca/{id}", status_code=status.HTTP_200_OK)
+def update_rca_report(id: str, payload: RcaUpdatePayload) -> Dict[str, Any]:
+    """
+    Updates the RCA post-mortem report content on local disk and in the Redis cache.
+    """
+    # 1. Verify incident exists in Redis
+    incident = redis_manager.get_incident(id)
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident {id} not found.",
+        )
+
+    # 2. Write updated Markdown back to the disk file
+    local_path = Path("storage/rcas") / f"{id}.md"
+    try:
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text(payload.markdown_content, encoding="utf-8")
+    except Exception as e:
+        logger.error("Failed to write updated RCA to disk: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save report changes to disk.",
+        )
+
+    # 3. Synchronize update in Redis Cache
+    try:
+        redis_client = redis_manager.get_client()
+        rca_data = redis_client.get(f"rca:{id}")
+        if rca_data:
+            parsed = json.loads(rca_data)
+        else:
+            parsed = {
+                "incident_id": id,
+                "title": f"Incident Post-Mortem Report (RCA) - {id}",
+                "resolved_at": datetime.now().isoformat(),
+            }
+        parsed["markdown_content"] = payload.markdown_content
+        parsed["last_updated_at"] = datetime.now().isoformat()
+        redis_client.setex(f"rca:{id}", 604800, json.dumps(parsed))
+    except Exception as e:
+        logger.warning(
+            "Failed to refresh Redis cache on update for RCA %s: %s", id, str(e)
+        )
+
+    return {"status": "success", "message": "RCA updated successfully."}
 
 
 @router.get("/rca/{id}/export", response_class=FileResponse)

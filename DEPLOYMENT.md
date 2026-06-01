@@ -84,12 +84,25 @@ docker logs sre_backend 2>&1 | grep "Watchdog check passed"
 ```
 
 ### [ ] 5. Slack Webhook Ingestion Verification
-Post a test alert to `/alerts` and confirm it does not crash the server:
+Post a test alert to `/alerts` and confirm it does not crash the server.
+
+> [!NOTE]
+> The `startsAt` parameter controls the **Alert Triggered** time shown in the UI. For manual testing, replace the hardcoded `startsAt` value with the current UTC time to prevent timeline and incident time mismatches.
+
+Example test requests with dynamic timestamps:
+
 ```bash
+# Linux / macOS (Bash)
 curl -i -X POST -H "Content-Type: application/json" \
-  -d '{"receiver":"prometheus-webhook","status":"firing","alerts":[{"labels":{"alertname":"TestProdAlert","service":"payment-service","severity":"critical"},"annotations":{"summary":"Test Summary","description":"Test Description"},"startsAt":"2026-05-27T10:00:00Z"}]}' \
+  -d "{\"receiver\":\"prometheus-webhook\",\"status\":\"firing\",\"alerts\":[{\"labels\":{\"alertname\":\"TestProdAlert\",\"service\":\"payment-service\",\"severity\":\"critical\"},\"annotations\":{\"summary\":\"Test Summary\",\"description\":\"Test Description\"},\"startsAt\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}]}" \
+  http://localhost:8000/alerts
+
+# Windows (PowerShell)
+curl -i -X POST -H "Content-Type: application/json" \
+  -d "{\"receiver\":\"prometheus-webhook\",\"status\":\"firing\",\"alerts\":[{\"labels\":{\"alertname\":\"TestProdAlert\",\"service\":\"payment-service\",\"severity\":\"critical\"},\"annotations\":{\"summary\":\"Test Summary\",\"description\":\"Test Description\"},\"startsAt\":\"$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))\"}]}" \
   http://localhost:8000/alerts
 ```
+
 Expected Response: `HTTP/1.1 202 Accepted`
 
 ---

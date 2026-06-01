@@ -8,7 +8,8 @@ optional Groq summary generation, and dual storage persistence (Redis + Local Fi
 import json
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Optional
 from pathlib import Path
 
@@ -46,7 +47,12 @@ class RCAGenerator:
 
             sev_rank = SEVERITY_ORDER.get(sev, 4)
             src_rank = SOURCE_ORDER.get(src, 4)
-            return (item.timestamp, sev_rank, src_rank)
+            
+            ts = item.timestamp
+            if ts.tzinfo is not None:
+                ts = ts.replace(tzinfo=None)
+                
+            return (ts, sev_rank, src_rank)
 
         return sorted(timeline, key=sort_key)
 
@@ -121,9 +127,29 @@ class RCAGenerator:
         resolved_at = "unknown time"
 
         if timeline:
-            sorted_t = sorted(timeline, key=lambda x: x.timestamp)
-            detected_at = sorted_t[0].timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            resolved_at = sorted_t[-1].timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            def get_naive_ts(x):
+                ts = x.timestamp
+                return ts.replace(tzinfo=None) if ts.tzinfo is not None else ts
+            sorted_t = sorted(timeline, key=get_naive_ts)
+            dt_start = sorted_t[0].timestamp
+            if isinstance(dt_start, str):
+                try:
+                    dt_start = datetime.fromisoformat(dt_start)
+                except ValueError:
+                    dt_start = datetime.now(timezone.utc)
+            if dt_start.tzinfo is None:
+                dt_start = dt_start.replace(tzinfo=timezone.utc)
+            detected_at = dt_start.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+
+            dt_end = sorted_t[-1].timestamp
+            if isinstance(dt_end, str):
+                try:
+                    dt_end = datetime.fromisoformat(dt_end)
+                except ValueError:
+                    dt_end = datetime.now(timezone.utc)
+            if dt_end.tzinfo is None:
+                dt_end = dt_end.replace(tzinfo=timezone.utc)
+            resolved_at = dt_end.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
 
         summary = f"Incident {incident_id} affected the service(s): {services_str}. "
 
@@ -156,7 +182,15 @@ class RCAGenerator:
         timeline_rows = ""
         if sorted_timeline:
             for t in sorted_timeline:
-                ts_str = t.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                dt_t = t.timestamp
+                if isinstance(dt_t, str):
+                    try:
+                        dt_t = datetime.fromisoformat(dt_t)
+                    except ValueError:
+                        dt_t = datetime.now(timezone.utc)
+                if dt_t.tzinfo is None:
+                    dt_t = dt_t.replace(tzinfo=timezone.utc)
+                ts_str = dt_t.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
                 msg_text = t.message.replace("|", "\\|")
                 timeline_rows += (
                     f"| {ts_str} | {t.source} | {t.severity.upper()} | {msg_text} |\n"
@@ -176,16 +210,31 @@ class RCAGenerator:
             else "Establish additional monitoring metrics alerts."
         )
 
-        detected_at = (
-            incident.created_at.strftime("%Y-%m-%d %H:%M:%S")
-            if incident.created_at
-            else "N/A"
-        )
-        resolved_at = (
-            incident.updated_at.strftime("%Y-%m-%d %H:%M:%S")
-            if incident.updated_at
-            else "N/A"
-        )
+        dt_created = incident.created_at
+        if isinstance(dt_created, str):
+            try:
+                dt_created = datetime.fromisoformat(dt_created)
+            except ValueError:
+                dt_created = None
+        if dt_created:
+            if dt_created.tzinfo is None:
+                dt_created = dt_created.replace(tzinfo=timezone.utc)
+            detected_at = dt_created.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+        else:
+            detected_at = "N/A"
+
+        dt_updated = incident.updated_at
+        if isinstance(dt_updated, str):
+            try:
+                dt_updated = datetime.fromisoformat(dt_updated)
+            except ValueError:
+                dt_updated = None
+        if dt_updated:
+            if dt_updated.tzinfo is None:
+                dt_updated = dt_updated.replace(tzinfo=timezone.utc)
+            resolved_at = dt_updated.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+        else:
+            resolved_at = "N/A"
 
         # Compile final template
         report = f"""# Incident Post-Mortem Report (RCA)

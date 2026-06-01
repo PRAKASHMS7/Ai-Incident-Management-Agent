@@ -7,7 +7,7 @@ Defines the individual execution steps (nodes) for the incident reasoning pipeli
 import json
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, cast
 
 from src.api.schemas import (
@@ -418,7 +418,7 @@ class WorkflowNodes:
         # Update incident timeline with reasoning steps
         incident.timeline.append(
             TimelineItem(
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 event_type="agent_milestone",
                 source="system",
                 message="Incident escalation card dispatched to Slack operators channel.",
