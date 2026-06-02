@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Kolkata';
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 

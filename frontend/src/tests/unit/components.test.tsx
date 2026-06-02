@@ -124,7 +124,7 @@ describe('TimelineViewer Component', () => {
 
     render(<TimelineViewer timeline={mockTimeline} />);
     
-    // We expect "30 May 2026, 09:37:12 PM IST" to be displayed in the document
-    expect(screen.getByText(/30 May 2026, 09:37:12 PM IST/)).toBeInTheDocument();
+    // We expect "30 May 2026, 09:37:12 PM IST" or "GMT+5:30" to be displayed in the document
+    expect(screen.getByText(/30 May 2026, 09:37:12 PM (IST|GMT\+5:30)/)).toBeInTheDocument();
   });
 });

@@ -17,6 +17,8 @@ export const TimelineViewer: React.FC<TimelineViewerProps> = ({ timeline }) => {
         return <Terminal className="w-4 h-4 text-red-500" />;
       case 'agent_milestone':
         return <Brain className="w-4 h-4 text-blue-400" />;
+      case 'incident_ingested':
+        return <Activity className="w-4 h-4 text-blue-400" />;
       case 'operator_action':
         return <CheckCircle className="w-4 h-4 text-green-400" />;
       case 'escalation_failed':
@@ -36,6 +38,8 @@ export const TimelineViewer: React.FC<TimelineViewerProps> = ({ timeline }) => {
         return 'bg-red-950/20 border-red-900/30';
       case 'agent_milestone':
         return 'bg-blue-500/10 border-blue-500/20';
+      case 'incident_ingested':
+        return 'bg-blue-500/10 border-blue-500/20';
       case 'operator_action':
         return 'bg-green-500/10 border-green-500/20';
       case 'escalation_failed':
@@ -49,15 +53,15 @@ export const TimelineViewer: React.FC<TimelineViewerProps> = ({ timeline }) => {
     <div className="relative pl-6 border-l-2 border-slate-800 flex flex-col gap-6 py-2">
       {timeline.map((item, idx) => {
         const date = new Intl.DateTimeFormat('en-GB', {
-          timeZone: 'Asia/Kolkata',
           day: '2-digit',
           month: 'short',
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
-          hour12: true
-        }).format(new Date(item.timestamp)).replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()) + ' IST';
+          hour12: true,
+          timeZoneName: 'short'
+        }).format(new Date(item.timestamp)).replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase());
         const formattedType = item.event_type.replace('_', ' ');
 
         return (

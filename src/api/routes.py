@@ -396,8 +396,8 @@ def get_rca_report(id: str) -> Response:
                 "incident_id": id,
                 "title": f"Incident Post-Mortem Report (RCA) - {id}",
                 "markdown_content": content,
-                "resolved_at": datetime.now().isoformat(),
-                "last_updated_at": datetime.now().isoformat(),
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
+                "last_updated_at": datetime.now(timezone.utc).isoformat(),
             }
             redis_client.setex(f"rca:{id}", 604800, json.dumps(rca_payload))
         except Exception as e:
@@ -448,10 +448,10 @@ def update_rca_report(id: str, payload: RcaUpdatePayload) -> Dict[str, Any]:
             parsed = {
                 "incident_id": id,
                 "title": f"Incident Post-Mortem Report (RCA) - {id}",
-                "resolved_at": datetime.now().isoformat(),
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
             }
         parsed["markdown_content"] = payload.markdown_content
-        parsed["last_updated_at"] = datetime.now().isoformat()
+        parsed["last_updated_at"] = datetime.now(timezone.utc).isoformat()
         redis_client.setex(f"rca:{id}", 604800, json.dumps(parsed))
     except Exception as e:
         logger.warning(
@@ -514,7 +514,7 @@ def get_rca_metadata_json(id: str) -> Dict[str, Any]:
         resolved_at = (
             incident.updated_at.isoformat()
             if (incident and incident.state == "resolved")
-            else datetime.now().isoformat()
+            else datetime.now(timezone.utc).isoformat()
         )
         return {
             "incident_id": id,

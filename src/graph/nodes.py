@@ -140,7 +140,7 @@ class WorkflowNodes:
         if raw_alerts:
             earliest_time = min([a.starts_at for a in raw_alerts])
         else:
-            earliest_time = datetime.now()
+            earliest_time = datetime.now(timezone.utc)
 
         starts_at = earliest_time - timedelta(minutes=5)
         ends_at = earliest_time + timedelta(minutes=5)
@@ -393,7 +393,7 @@ class WorkflowNodes:
         incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
         if incident:
             incident.hypotheses = state.get("hypotheses", [])
-            incident.updated_at = datetime.now()
+            incident.updated_at = datetime.now(timezone.utc)
             await asyncio.to_thread(redis_manager.save_incident, incident)
 
         # Import dynamically to avoid circular references if any
@@ -429,7 +429,7 @@ class WorkflowNodes:
         # Compile hypotheses
         incident.hypotheses = state.get("hypotheses", [])
         incident.state = "escalated"
-        incident.updated_at = datetime.now()
+        incident.updated_at = datetime.now(timezone.utc)
 
         # Save finalized state back to Redis
         await asyncio.to_thread(redis_manager.save_incident, incident)

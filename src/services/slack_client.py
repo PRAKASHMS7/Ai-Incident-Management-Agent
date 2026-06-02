@@ -72,14 +72,14 @@ class SlackClient:
                 dt = datetime.now(timezone.utc)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        ist_time = dt.astimezone(ZoneInfo("Asia/Kolkata"))
-        formatted_time = ist_time.strftime("%d %b %Y, %I:%M:%S %p IST")
+        epoch = int(dt.timestamp())
+        formatted_time = f"<!date^{epoch}^{{date_long}} at {{time}}|{dt.isoformat()}>"
         return {
             "type": "context",
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Incident ID:* `{incident_id}` | *Triggered:* `{formatted_time}` | *Services Affected:* `{', '.join(services)}`",
+                    "text": f"*Incident ID:* `{incident_id}` | *Triggered:* {formatted_time} | *Services Affected:* `{', '.join(services)}`",
                 }
             ],
         }
@@ -293,7 +293,7 @@ slack_client = SlackClient()
 
 # 5. Interactive Action Event Handlers
 @slack_app.action("slack_ack_incident")
-async def handle_ack_incident(ack, body, client):
+async def handle_ack_incident(ack, body, client, respond):
     """
     Listens for operator clicking 'Acknowledge' button on SRE Slack card.
     """
@@ -316,7 +316,7 @@ async def handle_ack_incident(ack, body, client):
         if created_dt.tzinfo is not None:
             now_dt = datetime.now(created_dt.tzinfo)
         else:
-            now_dt = datetime.now()
+            now_dt = datetime.now(timezone.utc)
         ack_duration = (now_dt - created_dt).total_seconds()
         operator_acknowledgement_duration_seconds.observe(ack_duration)
 
@@ -348,27 +348,38 @@ async def handle_ack_incident(ack, body, client):
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"✅ *Acknowledged by @{user_name}* at {datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')}",
+                    "text": f"✅ *Acknowledged by @{user_name}* at <!date^{int(datetime.now(timezone.utc).timestamp())}^{{date_long}} at {{time}}|{datetime.now(timezone.utc).isoformat()}>",
                 }
             ],
         }
     )
 
-    # Slack chat.update call
-    if settings.SLACK_BOT_TOKEN != "mock_token":
-        try:
-            await client.chat_update(
-                channel=channel_id,
-                ts=message_ts,
-                blocks=updated_blocks,
-                text="Incident Escalation Card Acknowledged",
-            )
-        except Exception as e:
-            logger.error("Failed to update Slack message card: %s", str(e))
+    # Slack card update using respond (primary) or client.chat_update (fallback)
+    try:
+        await respond(
+            replace_original=True,
+            blocks=updated_blocks,
+            text="Incident Escalation Card Acknowledged",
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to update Slack message card via respond: %s. Falling back to chat_update.",
+            str(e),
+        )
+        if settings.SLACK_BOT_TOKEN != "mock_token":
+            try:
+                await client.chat_update(
+                    channel=channel_id,
+                    ts=message_ts,
+                    blocks=updated_blocks,
+                    text="Incident Escalation Card Acknowledged",
+                )
+            except Exception as ex:
+                logger.error("Failed to update Slack message card via chat_update: %s", str(ex))
 
 
 @slack_app.action("slack_resolve_incident")
-async def handle_resolve_incident(ack, body, client):
+async def handle_resolve_incident(ack, body, client, respond):
     """
     Listens for operator clicking 'Resolve' button on the Slack card.
     """
@@ -389,7 +400,7 @@ async def handle_resolve_incident(ack, body, client):
             incident.state = "resolved"
             incident.timeline.append(
                 TimelineItem(
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     event_type="operator_action",
                     source="slack_operator",
                     message=f"Incident marked resolved by @{user_name} ({user_id}) via Slack.",
@@ -416,7 +427,7 @@ async def handle_resolve_incident(ack, body, client):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"🛡️ *Resolved by @{user_name}* at {datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')}",
+                        "text": f"🛡️ *Resolved by @{user_name}* at <!date^{int(datetime.now(timezone.utc).timestamp())}^{{date_long}} at {{time}}|{datetime.now(timezone.utc).isoformat()}>",
                     }
                 ],
             }
@@ -425,13 +436,26 @@ async def handle_resolve_incident(ack, body, client):
         logger.error("Failed to construct updated Blocks for Slack: %s", str(e))
         return
 
-    if settings.SLACK_BOT_TOKEN != "mock_token":
-        try:
-            await client.chat_update(
-                channel=channel_id,
-                ts=message_ts,
-                blocks=updated_blocks,
-                text="Incident Escalation Card Resolved",
-            )
-        except Exception as e:
-            logger.error("Failed to update Slack message card: %s", str(e))
+    # Slack card update using respond (primary) or client.chat_update (fallback)
+    try:
+        await respond(
+            replace_original=True,
+            blocks=updated_blocks,
+            text="Incident Escalation Card Resolved",
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to update Slack message card via respond: %s. Falling back to chat_update.",
+            str(e),
+        )
+        if settings.SLACK_BOT_TOKEN != "mock_token":
+            try:
+                await client.chat_update(
+                    channel=channel_id,
+                    ts=message_ts,
+                    blocks=updated_blocks,
+                    text="Incident Escalation Card Resolved",
+                )
+            except Exception as ex:
+                logger.error("Failed to update Slack message card via chat_update: %s", str(ex))
+

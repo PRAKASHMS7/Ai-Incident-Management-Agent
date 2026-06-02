@@ -7,6 +7,7 @@ and incident state repositories for Redis.
 
 import hashlib
 import logging
+import time
 from typing import Dict, Any, List, Optional
 import redis
 
@@ -16,6 +17,17 @@ from src.observability.tracer import tracer
 from src.observability.metrics import alert_deduplicated_total
 
 logger = logging.getLogger(__name__)
+
+
+def get_bloom_indices(raw_string: str, m: int = 100000, k: int = 3) -> List[int]:
+    """Generates k bit indices for a given string using SHA-256 salts."""
+    indices = []
+    for i in range(k):
+        # Generate a distinct hash per function using salt
+        salted = f"{raw_string}:{i}"
+        h = hashlib.sha256(salted.encode("utf-8")).hexdigest()
+        indices.append(int(h, 16) % m)
+    return indices
 
 
 class RedisClientManager:
@@ -92,11 +104,8 @@ class RedisClientManager:
         instance: Optional[str] = None,
     ) -> bool:
         """
-        Calculates a unique hash for an alert and checks if it has fired recently.
-        If unique, saves it with a 60-second TTL to collapse duplicates.
-
-        Returns:
-            bool: True if it is a duplicate (should be dropped), False if it is unique.
+        Calculates Bloom Filter indices for an alert and checks if it has fired recently
+        using epoch-rotated Redis bitmaps.
         """
         with tracer.start_as_current_span("redis.check_deduplicate") as span:
             span.set_attribute("db.system", "redis")
@@ -106,29 +115,44 @@ class RedisClientManager:
 
             client = self.get_client()
 
-            # Build deterministic hash key
             raw_string = f"{alertname}:{service}:{severity}:{instance or ''}"
-            alert_hash = hashlib.sha256(raw_string.encode("utf-8")).hexdigest()
-            redis_key = f"dedup:alert:{alert_hash}"
-            span.set_attribute("redis.key", redis_key)
+            m = 100000
+            k = 3
+            indices = get_bloom_indices(raw_string, m, k)
+
+            now = int(time.time())
+            current_epoch = now // 30
+            prev_epoch = current_epoch - 1
+
+            key_curr = f"dedup:bloom:{current_epoch}"
+            key_prev = f"dedup:bloom:{prev_epoch}"
 
             try:
-                # Try to set the key only if it does not exist (NX) with a 60s TTL (EX)
-                success = client.set(redis_key, "1", ex=60, nx=True)
-                if success:
-                    logger.debug(
-                        "Deduplication check passed. New alert hash: %s", alert_hash
-                    )
-                    span.set_attribute("redis.duplicate", False)
-                    return False
-                logger.info("Alert deduplicated. Dropping alert: %s", raw_string)
-                span.set_attribute("redis.duplicate", True)
+                pipe1 = client.pipeline()
+                for idx in indices:
+                    pipe1.getbit(key_curr, idx)
+                for idx in indices:
+                    pipe1.getbit(key_prev, idx)
+                results = pipe1.execute()
 
-                # Increment SRE Alert deduplicated counter
-                alert_deduplicated_total.labels(
-                    service=service, alertname=alertname
-                ).inc()
-                return True
+                curr_match = all(results[0:k])
+                prev_match = all(results[k:2*k])
+
+                if curr_match or prev_match:
+                    logger.info("Alert deduplicated. Dropping alert: %s", raw_string)
+                    span.set_attribute("redis.duplicate", True)
+                    alert_deduplicated_total.labels(
+                        service=service, alertname=alertname
+                    ).inc()
+                    return True
+
+                span.set_attribute("redis.duplicate", False)
+                pipe2 = client.pipeline()
+                for idx in indices:
+                    pipe2.setbit(key_curr, idx, 1)
+                pipe2.expire(key_curr, 90)
+                pipe2.execute()
+                return False
             except redis.RedisError as e:
                 logger.error(
                     "Deduplication lookup failed, defaulting to allow alert: %s", str(e)

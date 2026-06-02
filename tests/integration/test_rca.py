@@ -3,7 +3,7 @@ Integration tests for Phase 8 Timeline and RCA API endpoints, storage, and fallb
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pathlib import Path
@@ -66,7 +66,7 @@ def create_incident(mock_redis_db):
             service="payment-service",
             severity="critical",
             description="High error rate",
-            starts_at=datetime.now() - timedelta(minutes=10),
+            starts_at=datetime.now(timezone.utc) - timedelta(minutes=10),
         )
         incident = IncidentStateModel(
             id=incident_id,

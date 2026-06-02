@@ -6,7 +6,7 @@ import pytest
 import json
 import asyncio
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
@@ -63,7 +63,7 @@ def create_incident(mock_redis_db):
             service="payment-service",
             severity=severity,
             description="High error rate",
-            starts_at=datetime.now(),
+            starts_at=datetime.now(timezone.utc),
         )
         incident = IncidentStateModel(
             id=incident_id,
@@ -74,8 +74,8 @@ def create_incident(mock_redis_db):
             alerts=[alert],
             timeline=[],
             hypotheses=[],
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         redis_manager.save_incident(incident)
         return incident
@@ -115,6 +115,7 @@ async def test_slack_interactive_acknowledge_endpoint(mock_redis_db, create_inci
         "actions": [
             {"action_id": "slack_ack_incident", "value": "inc-ack", "type": "button"}
         ],
+        "response_url": "https://hooks.slack.com/actions/T12345/C99999/XYZ",
     }
 
     mock_auth_test = MockSlackResponse(
@@ -129,7 +130,9 @@ async def test_slack_interactive_acknowledge_endpoint(mock_redis_db, create_inci
         return_value=mock_auth_test,
     ), patch(
         "slack_sdk.web.async_client.AsyncWebClient.chat_update"
-    ) as mock_update:
+    ) as mock_update, patch(
+        "slack_bolt.context.respond.async_respond.AsyncRespond.__call__"
+    ) as mock_respond:
 
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
@@ -145,10 +148,11 @@ async def test_slack_interactive_acknowledge_endpoint(mock_redis_db, create_inci
 
             assert response.status_code == 200
             for _ in range(20):
-                if mock_update.call_count > 0:
+                if mock_respond.call_count > 0:
                     break
                 await asyncio.sleep(0.05)
-            mock_update.assert_called_once()
+            mock_respond.assert_called_once()
+            mock_update.assert_not_called()
 
             # Verify Redis state changed to 'analyzing'
             updated = redis_manager.get_incident("inc-ack")
@@ -192,6 +196,7 @@ async def test_slack_interactive_resolve_endpoint(mock_redis_db, create_incident
                 "type": "button",
             }
         ],
+        "response_url": "https://hooks.slack.com/actions/T12345/C99999/XYZ",
     }
 
     mock_auth_test = MockSlackResponse(
@@ -205,7 +210,9 @@ async def test_slack_interactive_resolve_endpoint(mock_redis_db, create_incident
         return_value=mock_auth_test,
     ), patch(
         "slack_sdk.web.async_client.AsyncWebClient.chat_update"
-    ) as mock_update:
+    ) as mock_update, patch(
+        "slack_bolt.context.respond.async_respond.AsyncRespond.__call__"
+    ) as mock_respond:
 
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
@@ -221,10 +228,11 @@ async def test_slack_interactive_resolve_endpoint(mock_redis_db, create_incident
 
             assert response.status_code == 200
             for _ in range(20):
-                if mock_update.call_count > 0:
+                if mock_respond.call_count > 0:
                     break
                 await asyncio.sleep(0.05)
-            mock_update.assert_called_once()
+            mock_respond.assert_called_once()
+            mock_update.assert_not_called()
 
             # Verify Redis state changed to 'resolved'
             updated = redis_manager.get_incident("inc-resolve")

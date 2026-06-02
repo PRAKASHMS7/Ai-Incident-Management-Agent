@@ -207,3 +207,76 @@ async def test_groq_client_retry_logic():
             assert mock_post.call_count == 3
             parsed = json.loads(result)
             assert len(parsed["hypotheses"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_groq_client_concurrency_limit():
+    """Verifies that the GroqClient limits concurrent HTTP requests to a maximum of 10."""
+    import asyncio
+    client = GroqClient(api_key="real_key")
+    
+    active_calls = 0
+    max_observed_concurrency = 0
+    lock = asyncio.Lock()
+    
+    async def mock_post(*args, **kwargs):
+        nonlocal active_calls, max_observed_concurrency
+        async with lock:
+            active_calls += 1
+            if active_calls > max_observed_concurrency:
+                max_observed_concurrency = active_calls
+        # Simulate network latency
+        await asyncio.sleep(0.05)
+        async with lock:
+            active_calls -= 1
+        
+        # Return mock response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "hypotheses": [
+                                    {
+                                        "rank": 1,
+                                        "hypothesis": "H1",
+                                        "confidence_score": 0.9,
+                                        "evidence": ["E1"],
+                                        "recommended_action": "A1",
+                                    },
+                                    {
+                                        "rank": 2,
+                                        "hypothesis": "H2",
+                                        "confidence_score": 0.7,
+                                        "evidence": ["E2"],
+                                        "recommended_action": "A2",
+                                    },
+                                    {
+                                        "rank": 3,
+                                        "hypothesis": "H3",
+                                        "confidence_score": 0.5,
+                                        "evidence": ["E3"],
+                                        "recommended_action": "A3",
+                                    },
+                                ]
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        return mock_response
+
+    # Patch the post method to record active calls
+    with patch.object(client.client, "post", side_effect=mock_post):
+        # Fire 15 concurrent requests
+        tasks = [client.get_reasoning("sys", f"user-{i}") for i in range(15)]
+        await asyncio.gather(*tasks)
+        
+        # Verify that max concurrency observed was at most 10
+        assert max_observed_concurrency <= 10
+        assert max_observed_concurrency > 0
+

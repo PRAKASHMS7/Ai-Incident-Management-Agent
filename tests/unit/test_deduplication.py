@@ -17,8 +17,10 @@ def test_deduplication_first_unique_then_duplicate():
     mock_redis = MagicMock()
     manager.get_client = MagicMock(return_value=mock_redis)
 
-    # Case 1: First time alert is seen (SET returns True/Success)
-    mock_redis.set.return_value = True
+    # Case 1: First time alert is seen (Bits are 0)
+    mock_pipe = MagicMock()
+    mock_pipe.execute.return_value = [0, 0, 0, 0, 0, 0]
+    mock_redis.pipeline.return_value = mock_pipe
     is_dup = manager.check_deduplicate(
         alertname="Http5xxRateHigh",
         service="payment-service",
@@ -27,11 +29,11 @@ def test_deduplication_first_unique_then_duplicate():
     )
 
     assert is_dup is False
-    mock_redis.set.assert_called_once()
+    mock_redis.pipeline.assert_called()
 
-    # Case 2: Alert is seen again within 60s (SET returns None/False because key exists)
-    mock_redis.set.reset_mock()
-    mock_redis.set.return_value = None
+    # Case 2: Alert is seen again within 60s (Bits are 1)
+    mock_redis.pipeline.reset_mock()
+    mock_pipe.execute.return_value = [1, 1, 1, 0, 0, 0]
     is_dup_again = manager.check_deduplicate(
         alertname="Http5xxRateHigh",
         service="payment-service",
@@ -40,4 +42,4 @@ def test_deduplication_first_unique_then_duplicate():
     )
 
     assert is_dup_again is True
-    mock_redis.set.assert_called_once()
+    mock_redis.pipeline.assert_called_once()

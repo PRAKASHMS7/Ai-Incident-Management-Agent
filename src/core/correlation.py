@@ -7,7 +7,7 @@ and merge multiple incidents during cascading failure overlaps.
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from src.api.schemas import StandardizedAlert, IncidentStateModel, TimelineItem
@@ -146,6 +146,14 @@ class CorrelationEngine:
             severity=alert.severity,
         )
 
+        ingestion_timeline_item = TimelineItem(
+            timestamp=datetime.now(timezone.utc),
+            event_type="incident_ingested",
+            source="system",
+            message="Incident ingested in the SRE coordination backend.",
+            severity="info",
+        )
+
         return IncidentStateModel(
             id=incident_id,
             state="open",
@@ -153,7 +161,7 @@ class CorrelationEngine:
             services_affected=[alert.service],
             primary_incident_alert_id=alert.id,
             alerts=[alert],
-            timeline=[timeline_item],
+            timeline=[timeline_item, ingestion_timeline_item],
             hypotheses=[],
             created_at=alert.starts_at,
             updated_at=alert.starts_at,
@@ -243,7 +251,7 @@ class CorrelationEngine:
             primary.timeline.extend(secondary.timeline)
 
             # Log merge action on primary timeline
-            merge_time = datetime.now()
+            merge_time = datetime.now(timezone.utc)
             primary.timeline.append(
                 TimelineItem(
                     timestamp=merge_time,

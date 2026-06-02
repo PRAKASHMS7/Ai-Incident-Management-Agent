@@ -10,6 +10,7 @@ import logging
 import json
 import httpx
 import time
+import asyncio
 from typing import Dict, Any
 from tenacity import (
     retry,
@@ -49,7 +50,24 @@ class GroqClient:
     def __init__(self, api_key: str = settings.GROQ_API_KEY) -> None:
         self.api_key = api_key
         self.base_url = "https://api.groq.com/openai/v1/chat/completions"
-        self.client = httpx.AsyncClient(timeout=10.0)
+        self._clients: Dict[asyncio.AbstractEventLoop, httpx.AsyncClient] = {}
+        self._semaphores: Dict[asyncio.AbstractEventLoop, asyncio.Semaphore] = {}
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """Returns an httpx.AsyncClient bound to the currently running event loop."""
+        loop = asyncio.get_running_loop()
+        if loop not in self._clients:
+            self._clients[loop] = httpx.AsyncClient(timeout=10.0)
+        return self._clients[loop]
+
+    @property
+    def semaphore(self) -> asyncio.Semaphore:
+        """Returns an asyncio.Semaphore bound to the currently running event loop."""
+        loop = asyncio.get_running_loop()
+        if loop not in self._semaphores:
+            self._semaphores[loop] = asyncio.Semaphore(10)
+        return self._semaphores[loop]
 
     @retry(
         retry=retry_if_exception(is_retryable),
@@ -69,9 +87,10 @@ class GroqClient:
         }
 
         logger.info("Sending request to Groq API using model: %s", payload.get("model"))
-        response = await self.client.post(self.base_url, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+        async with self.semaphore:
+            response = await self.client.post(self.base_url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()
 
     async def get_reasoning(
         self,
@@ -188,8 +207,10 @@ class GroqClient:
                 raise e
 
     async def close(self) -> None:
-        """Closes the underlying HTTP client."""
-        await self.client.aclose()
+        """Closes all underlying HTTP clients."""
+        for client in self._clients.values():
+            await client.aclose()
+        self._clients.clear()
 
 
 # Singleton instance
