@@ -1,6 +1,14 @@
 import React from 'react';
 import { useIncidentStore } from '../../api/client';
-import { Database, Activity, RefreshCw } from 'lucide-react';
+import { 
+  Brain, 
+  Search, 
+  Moon, 
+  Bell, 
+  RefreshCw, 
+  Database,
+  Activity
+} from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { systemHealth, fetchSystemHealth, loading } = useIncidentStore();
@@ -15,47 +23,100 @@ export const Header: React.FC = () => {
   const watchdogActive = systemHealth?.status === 'healthy';
 
   return (
-    <header className="h-16 bg-card/40 backdrop-blur-md border-b border-border flex items-center justify-between px-8 z-10">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-slate-100 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-          AI Incident Command Center
-        </h1>
-        <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md border border-slate-700">
-          Agent Platform
-        </span>
+    <header className="h-20 bg-[#0B1020]/90 backdrop-blur-md border-b border-slate-800/80 flex items-center justify-between px-8 z-20 select-none">
+      {/* Branding Section (Left Side) */}
+      <div className="flex items-center gap-4 shrink-0">
+        <div className="w-10 h-10 rounded-2xl bg-purple-600/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-[0_0_16px_rgba(168,85,247,0.2)]">
+          <Brain className="w-6 h-6 animate-pulse" />
+        </div>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-extrabold tracking-tight text-slate-100 bg-gradient-to-r from-purple-400 via-purple-300 to-sky-400 bg-clip-text text-transparent font-sans leading-none">
+              AI Incident Management
+            </h1>
+            <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] font-extrabold uppercase tracking-widest">
+              SaaS Enterprise
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+            AI-Powered SRE Command Center
+          </span>
+        </div>
       </div>
 
+      {/* Global Controls & Diagnostic indicators (Right Side) */}
       <div className="flex items-center gap-6">
-        {/* Watchdog status indicator */}
-        <div className="flex items-center gap-2 bg-slate-900/60 border border-border px-3 py-1.5 rounded-lg text-xs">
-          <div className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${watchdogActive ? 'bg-success' : 'bg-critical'}`}></span>
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${watchdogActive ? 'bg-success' : 'bg-critical'}`}></span>
-          </div>
-          <span className="font-medium text-slate-300">Watchdog Heartbeat</span>
+        {/* Search bar */}
+        <div className="relative w-64 hidden xl:block">
+          <input 
+            type="text" 
+            placeholder="Search incidents..."
+            className="w-full bg-[#050816] border border-slate-800 rounded-xl py-2 pl-8 pr-12 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500/40"
+          />
+          <Search className="w-4 h-4 text-slate-500 absolute left-2.5 top-2.5" />
+          <span className="absolute right-2 top-2 bg-[#0B1020] border border-slate-800 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-500 font-mono">Ctrl + K</span>
         </div>
 
-        {/* Database connectivity indicators */}
-        <div className="flex items-center gap-4 text-xs border-r border-border pr-6">
-          <div className="flex items-center gap-1.5" title={`Redis: ${redisUp ? 'Connected' : 'Disconnected'}`}>
-            <Database className={`w-3.5 h-3.5 ${redisUp ? 'text-success' : 'text-slate-500'}`} />
-            <span className={redisUp ? 'text-slate-300' : 'text-slate-500'}>Redis</span>
+        {/* Dynamic Diagnostics indicators (Redis, Neo4j, Watchdog) */}
+        <div className="flex items-center gap-4 bg-[#050816]/75 border border-slate-800/80 px-4 py-2 rounded-xl text-[10px] text-slate-400 font-semibold shadow-inner">
+          {/* Watchdog status */}
+          <div className="flex items-center gap-1.5" title={`Watchdog Heartbeat: ${watchdogActive ? 'Active' : 'Offline'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${watchdogActive ? 'bg-emerald-500 status-pulse-green' : 'bg-rose-500'}`}></span>
+            <span>Watchdog</span>
           </div>
-          <div className="flex items-center gap-1.5" title={`Neo4j: ${neo4jUp ? 'Connected' : 'Disconnected'}`}>
-            <Activity className={`w-3.5 h-3.5 ${neo4jUp ? 'text-success' : 'text-slate-500'}`} />
-            <span className={neo4jUp ? 'text-slate-300' : 'text-slate-500'}>Neo4j</span>
+          <span className="text-slate-800">|</span>
+
+          {/* Redis status */}
+          <div className="flex items-center gap-1.5" title={`Redis Store: ${redisUp ? 'Connected' : 'Offline'}`}>
+            <Database className={`w-3 h-3 ${redisUp ? 'text-emerald-500' : 'text-rose-500'}`} />
+            <span>Redis</span>
           </div>
+          <span className="text-slate-800">|</span>
+
+          {/* Neo4j status */}
+          <div className="flex items-center gap-1.5" title={`Neo4j Topology: ${neo4jUp ? 'Connected' : 'Offline'}`}>
+            <Activity className={`w-3 h-3 ${neo4jUp ? 'text-emerald-500' : 'text-rose-500'}`} />
+            <span>Neo4j</span>
+          </div>
+
+          {/* Force manual refresh */}
+          <button 
+            onClick={handleRefresh}
+            disabled={loading}
+            className="p-1 rounded bg-[#0b0f19] border border-slate-800 text-slate-400 hover:text-purple-400 hover:border-purple-500/30 transition-all disabled:opacity-50 ml-1.5"
+            title="Force diagnostic check"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
-        {/* Manual refresh button */}
-        <button 
-          onClick={handleRefresh} 
-          disabled={loading}
-          className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-primary hover:border-primary/50 transition-colors disabled:opacity-50"
-          title="Refresh connection states"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        {/* Global toggles controls */}
+        <div className="flex items-center gap-3">
+          <button className="p-2 rounded-lg hover:bg-slate-850 text-slate-400 hover:text-slate-200 transition-colors">
+            <Moon className="w-4.5 h-4.5" />
+          </button>
+
+          <button className="p-2 rounded-lg hover:bg-slate-850 text-slate-400 hover:text-slate-200 transition-colors relative">
+            <Bell className="w-4.5 h-4.5" />
+            <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center border border-navyDark shadow-md">
+              8
+            </span>
+          </button>
+        </div>
+
+        {/* Prakash Profile card */}
+        <div className="flex items-center gap-3 pl-3 border-l border-slate-850 cursor-pointer hover:opacity-90 transition-opacity">
+          <div className="flex flex-col items-end">
+            <span className="text-xs font-bold text-slate-200 leading-tight">Prakash</span>
+            <span className="text-[9px] font-bold text-slate-500 tracking-widest leading-none mt-1">SRE OPERATOR</span>
+          </div>
+          <div className="relative">
+            <div className="w-9 h-9 rounded-full bg-purple-600/10 border border-purple-500/30 text-purple-400 flex items-center justify-center font-bold text-xs shadow-md">
+              P
+            </div>
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-navyDark"></span>
+          </div>
+        </div>
       </div>
     </header>
   );

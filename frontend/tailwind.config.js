@@ -7,14 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "hsl(222 47% 11%)",
-        card: "hsl(223 47% 15%)",
-        border: "hsl(217 32% 17%)",
-        primary: "hsl(217 91% 60%)",
-        critical: "hsl(0 84% 60%)",
-        warning: "hsl(38 92% 50%)",
-        info: "hsl(200 95% 48%)",
-        success: "hsl(142 76% 45%)"
+        background: "#050816",
+        card: "#0B1020",
+        border: "rgba(255, 255, 255, 0.06)",
+        primary: "#A855F7", // Purple Accent
+        secondary: "#38BDF8", // Cyan Accent
+        success: "#22C55E",
+        warning: "#F59E0B",
+        critical: "#EF4444",
+        navyDark: "#050816",
+        navyMid: "#0B1020",
+        navyLight: "#121B35",
       }
     },
   },

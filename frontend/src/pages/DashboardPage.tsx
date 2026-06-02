@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useIncidentStore, usePolling } from '../api/client';
 import { IncidentCard } from '../components/dashboard/IncidentCard';
 import { IncidentTable } from '../components/dashboard/IncidentTable';
-import { Search, SlidersHorizontal, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Search, SlidersHorizontal, AlertCircle, CheckCircle, RefreshCw, Layers, ShieldAlert, Sparkles } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const { incidents, fetchIncidents, resolveIncident, fetchSystemHealth, error } = useIncidentStore();
@@ -37,29 +37,29 @@ export const DashboardPage: React.FC = () => {
 
     let matchesState = true;
     if (stateFilter === 'ACTIVE') {
-      matchesState = inc.state !== 'resolved';
+      matchesState = inc.state !== 'resolved' && inc.state !== 'approval_rejected';
     } else if (stateFilter === 'RESOLVED') {
-      matchesState = inc.state === 'resolved';
+      matchesState = inc.state === 'resolved' || inc.state === 'approval_rejected';
     }
 
     return matchesSearch && matchesSeverity && matchesState;
   });
 
-  const activeCount = incidents.filter((i) => i.state !== 'resolved').length;
-  const criticalCount = incidents.filter((i) => i.severity.toLowerCase() === 'critical' && i.state !== 'resolved').length;
+  const activeCount = incidents.filter((i) => i.state !== 'resolved' && i.state !== 'approval_rejected').length;
+  const criticalCount = incidents.filter((i) => i.severity.toLowerCase() === 'critical' && i.state !== 'resolved' && i.state !== 'approval_rejected').length;
 
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <div className="flex flex-col gap-6 w-full text-slate-100 select-none animate-fadeIn">
       {/* Top Welcome/Dashboard stats */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-4">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-100">Triage Workbench</h2>
-          <p className="text-xs text-slate-400 mt-1">Real-time alert aggregation, automated correlation, and root cause diagnostic states.</p>
+      <div className="bg-[#0D1830]/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg">
+        <div className="flex flex-col gap-1 z-10">
+          <h2 className="text-lg font-extrabold font-sans tracking-tight">Triage Workbench</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Real-time alert aggregation, automated correlation, and root cause diagnostic states.</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="px-4 py-2 bg-slate-800 border border-slate-700 hover:border-primary/50 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50"
+          className="px-4 py-2 bg-slate-800 border border-slate-700 hover:border-primary/50 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 z-10 shadow-md"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
           Force Sync
@@ -73,55 +73,61 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Counters layout */}
+      {/* Counters layout (Grident styled) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="glass-panel p-5 rounded-xl border border-border flex items-center gap-4">
-          <div className="p-3 bg-critical/10 rounded-xl border border-critical/20 text-critical">
-            <AlertCircle className="w-6 h-6" />
+        {/* KPI 1 */}
+        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex items-center gap-4 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-rose-500/10 transition-all duration-300"></div>
+          <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 text-rose-400 shadow-md">
+            <ShieldAlert className="w-6 h-6" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Active Critical Issues</p>
-            <p className="text-2xl font-bold text-slate-100 mt-0.5">{criticalCount}</p>
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest leading-none">Active Critical Issues</p>
+            <p className="text-2xl font-extrabold text-slate-100 mt-1.5 leading-none">{criticalCount}</p>
           </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-xl border border-border flex items-center gap-4">
-          <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 text-primary">
+        {/* KPI 2 */}
+        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex items-center gap-4 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-300"></div>
+          <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shadow-md">
             <AlertCircle className="w-6 h-6 animate-pulse" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Active Incidents</p>
-            <p className="text-2xl font-bold text-slate-100 mt-0.5">{activeCount}</p>
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest leading-none">Total Active Incidents</p>
+            <p className="text-2xl font-extrabold text-slate-100 mt-1.5 leading-none">{activeCount}</p>
           </div>
         </div>
 
-        <div className="glass-panel p-5 rounded-xl border border-border flex items-center gap-4">
-          <div className="p-3 bg-success/10 rounded-xl border border-success/20 text-success">
+        {/* KPI 3 */}
+        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex items-center gap-4 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-300"></div>
+          <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 shadow-md">
             <CheckCircle className="w-6 h-6" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Closed Post-Mortems</p>
-            <p className="text-2xl font-bold text-slate-100 mt-0.5">{incidents.length - activeCount}</p>
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest leading-none">Closed Post-Mortems</p>
+            <p className="text-2xl font-extrabold text-slate-100 mt-1.5 leading-none">{incidents.length - activeCount}</p>
           </div>
         </div>
       </div>
 
       {/* Filters and Search toolbar */}
-      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center bg-slate-900/10 border border-border/80 p-4 rounded-xl">
+      <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center bg-[#0D1830]/60 border border-slate-800/80 p-4 rounded-2xl shadow-md">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search by service name, incident ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950/80 border border-border rounded-lg pl-10 pr-4 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-primary/50"
+            className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500/40"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-            <SlidersHorizontal className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-450 uppercase tracking-wide">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
             Filters:
           </div>
 
@@ -129,7 +135,8 @@ export const DashboardPage: React.FC = () => {
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
-            className="bg-slate-950 border border-border rounded-lg px-3 py-2 text-xs text-slate-300 font-semibold focus:outline-none focus:border-primary/50"
+            className="bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-bold focus:outline-none focus:border-purple-500/40 appearance-none pr-8 cursor-pointer relative"
+            style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
           >
             <option value="ALL">All Severities</option>
             <option value="CRITICAL">Critical</option>
@@ -141,7 +148,8 @@ export const DashboardPage: React.FC = () => {
           <select
             value={stateFilter}
             onChange={(e) => setStateFilter(e.target.value)}
-            className="bg-slate-950 border border-border rounded-lg px-3 py-2 text-xs text-slate-300 font-semibold focus:outline-none focus:border-primary/50"
+            className="bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 font-bold focus:outline-none focus:border-purple-500/40 appearance-none pr-8 cursor-pointer"
+            style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2394a3b8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
           >
             <option value="ACTIVE">Active Triage</option>
             <option value="RESOLVED">Resolved / Closed</option>
@@ -153,7 +161,10 @@ export const DashboardPage: React.FC = () => {
       {/* Grid view of active cards */}
       {stateFilter === 'ACTIVE' && filteredIncidents.length > 0 && (
         <div className="flex flex-col gap-3">
-          <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Active Alerts Action View</h3>
+          <div className="flex items-center gap-2 px-1">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <h3 className="text-xs font-bold text-slate-450 tracking-widest uppercase">Active Alerts Action View</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredIncidents.map((inc) => (
               <IncidentCard
@@ -167,8 +178,11 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* List view of all matching */}
-      <div className="flex flex-col gap-3">
-        <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Unified Incident Log</h3>
+      <div className="flex flex-col gap-3 mt-2">
+        <div className="flex items-center gap-2 px-1">
+          <Layers className="w-4 h-4 text-purple-400" />
+          <h3 className="text-xs font-bold text-slate-455 tracking-widest uppercase">Unified Incident Log</h3>
+        </div>
         <IncidentTable
           incidents={filteredIncidents}
           onResolve={resolveIncident}

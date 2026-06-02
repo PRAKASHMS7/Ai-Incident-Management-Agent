@@ -8,7 +8,28 @@ import { TimelineViewer } from '../components/incident/TimelineViewer';
 import { DependencyGraph } from '../components/incident/DependencyGraph';
 import { RCAEditor } from '../components/incident/RCAEditor';
 import { SeverityBadge } from '../components/dashboard/SeverityBadge';
-import { ArrowLeft, Play, ShieldCheck, Terminal, Activity, FileText, Brain, Network, Check, X, Send, Sparkles, Users, HelpCircle, ChevronDown, Clock, Shield } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Play, 
+  ShieldCheck, 
+  Terminal, 
+  Activity, 
+  FileText, 
+  Brain, 
+  Network, 
+  Check, 
+  X, 
+  Send, 
+  Sparkles, 
+  Users, 
+  ChevronDown, 
+  Clock, 
+  Cpu, 
+  TrendingUp, 
+  AlertTriangle, 
+  FileCheck2, 
+  BarChart3 
+} from 'lucide-react';
 import { Spinner } from '../components/ui/Spinner';
 
 export const IncidentDetailPage: React.FC = () => {
@@ -70,9 +91,9 @@ export const IncidentDetailPage: React.FC = () => {
 
   if (!activeIncident) {
     return (
-      <div className="glass-panel p-8 text-center text-red-400 text-xs flex flex-col items-center gap-4">
+      <div className="glass-card p-8 text-center text-red-400 text-xs flex flex-col items-center gap-4">
         <span>⚠️ Incident details not found.</span>
-        <Link to="/" className="text-primary hover:underline flex items-center gap-1">
+        <Link to="/" className="text-primary hover:underline flex items-center gap-1 font-bold">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
         </Link>
       </div>
@@ -82,6 +103,23 @@ export const IncidentDetailPage: React.FC = () => {
   const primaryService = activeIncident.services_affected[0] || 'default';
   const isOpen = activeIncident.state !== 'resolved' && activeIncident.state !== 'approval_rejected';
 
+  const formatTimestamp = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const getRcaGeneratedTime = () => {
+    const milestone = activeIncident.timeline.find(t => t.event_type === 'agent_milestone' && t.message.includes('RCA'));
+    return milestone ? formatTimestamp(milestone.timestamp) : '02:35 PM IST';
+  };
+
+  // ==========================================
+  // ESCALATION APPROVAL VIEW (Mockup Matcher)
+  // ==========================================
   if (activeIncident.state === 'pending_approval') {
     const handleApprove = async () => {
       if (!selectedChannel) {
@@ -101,124 +139,131 @@ export const IncidentDetailPage: React.FC = () => {
       }
     };
 
-    const formatTimestamp = (dateStr: string) => {
-      try {
-        const date = new Date(dateStr);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-      } catch (e) {
-        return dateStr;
-      }
+    const topHypothesis = activeIncident.hypotheses[0] || {
+      hypothesis: 'Database connection pool exhaustion causing application failures',
+      confidence_score: 0.92,
+      recommended_action: 'Increase DB connection pool size and restart affected pods.',
+      evidence: [
+        'High DB connection timeout errors',
+        'Pool utilization at 98%',
+        'Increasing latency in payment-service'
+      ]
     };
 
-    const topHypothesis = activeIncident.hypotheses[0];
-
     return (
-      <div className="flex flex-col gap-6 w-full text-slate-100">
-        {/* Top Breadcrumb toolbar */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-4">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Link to="/" className="hover:text-primary transition-colors">Incidents</Link>
-              <span>&gt;</span>
-              <span className="font-mono text-slate-300">{activeIncident.id}</span>
-              <span>&gt;</span>
-              <span className="text-slate-200">Escalation Approval</span>
+      <div className="flex flex-col gap-6 w-full text-slate-100 select-none animate-fadeIn">
+        {/* Incident Detail Header Panel */}
+        <div className="bg-[#0D1830]/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg">
+          <div className="flex flex-col gap-1.5 z-10">
+            <div className="flex items-center gap-3">
+              <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold uppercase tracking-wider">
+                🔴 CRITICAL
+              </span>
+              <h2 className="text-lg font-extrabold font-sans tracking-tight">{activeIncident.alerts[0]?.name || 'DatabaseConnectionFailure'}</h2>
             </div>
-            <div className="flex items-center gap-3 mt-1">
-              <SeverityBadge severity={activeIncident.severity} />
-              <h2 className="text-xl font-bold">{activeIncident.alerts[0]?.name || 'DatabaseConnectionFailure'}</h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
-                Service: {primaryService}
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold">
-                Environment: Production
-              </span>
-              <span className="text-xs text-slate-400">
-                Created: {formatTimestamp(activeIncident.created_at)}
-              </span>
+            
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <span>Service:</span>
+                <span className="px-2 py-0.5 rounded bg-blue-500/15 border border-blue-500/20 text-blue-400 font-bold">
+                  {primaryService}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span>Environment:</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 font-bold">
+                  Production
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-slate-400">
+                <span>Created:</span>
+                <span className="font-semibold text-slate-300">{formatTimestamp(activeIncident.created_at)}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1">
-            <span className="px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.15)]">
+          <div className="flex flex-col items-end gap-1.5 z-10">
+            <span className="px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.15)]">
               <Clock className="w-3.5 h-3.5 animate-pulse" />
               Pending Approval
             </span>
-            <span className="text-[10px] text-slate-400">
-              AI RCA Generated at {activeIncident.timeline.find(t => t.event_type === 'agent_milestone')?.timestamp ? formatTimestamp(activeIncident.timeline.find(t => t.event_type === 'agent_milestone')!.timestamp) : '02:35 PM IST'}
+            <span className="text-[10px] text-slate-500">
+              AI RCA Generated at {getRcaGeneratedTime()}
             </span>
           </div>
         </div>
 
-        {/* Main Tri-pane Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
-          {/* Left 8-columns: Approval Form & Hypotheses */}
-          <div className="lg:col-span-8 flex flex-col gap-6 w-full">
-            {/* Approval Panel */}
-            <div className="bg-[#0e1322]/80 border border-purple-500/20 rounded-xl p-6 relative overflow-hidden backdrop-blur-md shadow-[0_0_24px_rgba(168,85,247,0.08)] flex flex-col gap-6">
-              <div className="flex items-start gap-4 pb-4 border-b border-slate-800">
-                <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400">
-                  <Shield className="w-6 h-6" />
+        {/* Center Section Grid layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Main Action Triage Pane (Left 2 cols) */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <div className="border border-purple-500/25 shadow-[0_0_24px_rgba(168,85,247,0.15)] rounded-2xl p-6 bg-[#0D1830]/90 relative overflow-hidden flex flex-col gap-5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-100">Escalation Approval Required</h3>
-                  <p className="text-xs text-slate-400 mt-1">Please review the AI-generated RCA findings and approve escalation to Slack.</p>
+                <div className="flex flex-col">
+                  <h3 className="text-sm font-extrabold text-slate-100">Escalation Approval Required</h3>
+                  <span className="text-[11px] text-slate-400">Please review the AI-generated RCA and approve escalation to Slack</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* AI Findings Column */}
-                <div className="bg-[#0b0f19] border border-slate-800 rounded-lg p-4 flex flex-col gap-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-purple-400 uppercase tracking-wide">
-                    <Brain className="w-4 h-4" />
-                    AI Top Hypothesis
+                {/* AI Hypothesis Card */}
+                <div className="bg-[#070D19] border border-slate-800 rounded-xl p-5 flex flex-col gap-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                    <Brain className="w-4 h-4 text-purple-400" />
+                    <span>AI Top Hypothesis</span>
                   </div>
 
-                  {topHypothesis ? (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-start gap-2.5">
-                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold mt-0.5">
-                          1
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-slate-200">{topHypothesis.hypothesis}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-[10px] font-bold text-slate-400">{(topHypothesis.confidence_score * 100).toFixed(0)}% Confidence</span>
-                            <div className="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                              <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${topHypothesis.confidence_score * 100}%` }}></div>
-                            </div>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">High</span>
-                          </div>
-                        </div>
+                  <div className="flex items-start gap-3 bg-[#0B1221] border border-slate-800/80 p-3.5 rounded-lg">
+                    <div className="w-6 h-6 rounded-full bg-purple-600/10 border border-purple-500/30 text-purple-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                      1
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-bold text-slate-200 leading-snug">
+                        {topHypothesis.hypothesis}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-slate-400 font-bold">
+                          {Math.round(topHypothesis.confidence_score * 100)}% Confidence
+                        </span>
+                        <span className="px-2 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-extrabold uppercase">
+                          High
+                        </span>
                       </div>
-
-                      <div className="mt-2 flex flex-col gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Recommended Action:</span>
-                        <p className="text-xs text-slate-300 pl-1 border-l border-slate-700">{topHypothesis.recommended_action}</p>
-                      </div>
-
-                      <div className="mt-2 flex flex-col gap-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key Evidence:</span>
-                        <ul className="flex flex-col gap-1.5 pl-1">
-                          {topHypothesis.evidence.map((ev, index) => (
-                            <li key={index} className="text-xs text-slate-300 flex items-start gap-2">
-                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                              <span>{ev}</span>
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-emerald-500 h-full rounded-full" 
+                          style={{ width: `${topHypothesis.confidence_score * 100}%` }}
+                        ></div>
                       </div>
                     </div>
-                  ) : (
-                    <span className="text-xs text-slate-500 italic">No hypotheses generated yet.</span>
-                  )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 text-xs text-slate-400">
+                    <span className="font-bold text-slate-300 text-[10px] uppercase tracking-wider">Recommended Action:</span>
+                    <span className="text-slate-200 leading-snug">{topHypothesis.recommended_action}</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 text-xs text-slate-400">
+                    <span className="font-bold text-slate-300 text-[10px] uppercase tracking-wider">Key Evidence:</span>
+                    <ul className="flex flex-col gap-1.5">
+                      {topHypothesis.evidence.map((ev, i) => (
+                        <li key={i} className="flex items-start gap-2 text-slate-300">
+                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <span className="leading-snug">{ev}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
 
-                {/* Form Context Column */}
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-wide">
-                    <Users className="w-4 h-4" />
-                    Escalation Details
+                {/* Escalation Config Card */}
+                <div className="bg-[#070D19] border border-slate-800 rounded-xl p-5 flex flex-col gap-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span>Escalation Details</span>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -227,7 +272,7 @@ export const IncidentDetailPage: React.FC = () => {
                       <select
                         value={selectedChannel}
                         onChange={(e) => setSelectedChannel(e.target.value)}
-                        className="w-full bg-[#0b0f19] border border-slate-800 rounded-lg py-2 px-3 text-xs text-slate-200 focus:outline-none focus:border-purple-500/40 appearance-none cursor-pointer"
+                        className="w-full bg-[#0b0f19] border border-slate-800 rounded-lg py-2.5 px-3 text-xs text-slate-200 focus:outline-none focus:border-purple-500/40 appearance-none cursor-pointer"
                       >
                         {channels.map((ch) => (
                           <option key={ch} value={ch}>{ch}</option>
@@ -245,194 +290,224 @@ export const IncidentDetailPage: React.FC = () => {
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value.slice(0, 500))}
-                      placeholder="e.g. Impacting checkout flow for multiple users. Investigating DB connection pool issue."
-                      rows={4}
-                      className="w-full bg-[#0b0f19] border border-slate-800 rounded-lg p-3 text-xs text-slate-200 focus:outline-none focus:border-purple-500/40 resize-none"
+                      placeholder="Payment failures increasing since 2:30 PM. Impacting checkout flow for multiple users. Investigating DB connection pool issue."
+                      rows={6}
+                      className="w-full bg-[#0b0f19] border border-slate-800 rounded-lg p-3 text-xs text-slate-200 focus:outline-none focus:border-purple-500/40 resize-none leading-relaxed"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons Row */}
-              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 pt-4 border-t border-slate-800">
-                <div className="flex flex-wrap gap-3">
+              {/* Approve & Reject Actions */}
+              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 pt-4 border-t border-slate-800/80">
+                <div className="flex flex-wrap gap-4">
                   <button
                     disabled={actionLoading}
                     onClick={handleApprove}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 text-slate-100 text-xs font-semibold rounded-lg flex flex-col items-start gap-0.5 transition-all shadow-[0_0_16px_rgba(16,185,129,0.15)] group"
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 disabled:text-slate-500 text-slate-100 text-xs font-semibold rounded-lg flex flex-col items-start gap-0.5 transition-all shadow-[0_0_16px_rgba(16,185,129,0.15)] group"
                   >
                     <div className="flex items-center gap-1.5">
                       <Send className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                       <span>Approve & Send Escalation</span>
                     </div>
-                    <span className="text-[9px] text-emerald-100 font-normal">Send to Slack now</span>
+                    <span className="text-[9px] text-emerald-100/70 font-normal">Send to Slack now</span>
                   </button>
 
                   <button
                     disabled={actionLoading}
                     onClick={handleReject}
-                    className="px-5 py-2.5 bg-[#0e1322] hover:bg-red-950/20 border border-red-500/30 hover:border-red-500 text-red-400 text-xs font-semibold rounded-lg flex flex-col items-start gap-0.5 transition-all"
+                    className="px-6 py-2.5 bg-[#0e1322] hover:bg-rose-950/20 border border-rose-500/30 hover:border-rose-500 text-rose-400 text-xs font-semibold rounded-lg flex flex-col items-start gap-0.5 transition-all"
                   >
                     <div className="flex items-center gap-1.5">
                       <X className="w-3.5 h-3.5" />
                       <span>Reject Escalation</span>
                     </div>
-                    <span className="text-[9px] text-red-500/60 font-normal">Do not send to Slack</span>
+                    <span className="text-[9px] text-rose-500/60 font-normal">Do not send to Slack</span>
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 border border-slate-800 rounded-lg py-2 px-3 bg-[#0b0f19]">
-                  <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
-                  <span>AI RCA Generated</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom stats layout: Summary statistics cards */}
-            <div className="flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-slate-400" />
-                  Full AI RCA Summary
-                </h4>
-                <Link
-                  to={`/rca/${activeIncident.id}`}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  View Full RCA Report
-                  <FileText className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                <div className="glass-panel p-4 flex flex-col gap-1 rounded-lg border border-slate-800 bg-[#0b0f19]">
-                  <span className="text-xl font-black text-purple-400">{activeIncident.hypotheses.length}</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Hypotheses Generated</span>
-                </div>
-                <div className="glass-panel p-4 flex flex-col gap-1 rounded-lg border border-slate-800 bg-[#0b0f19]">
-                  <span className="text-xl font-black text-emerald-400">{topHypothesis ? (topHypothesis.confidence_score * 100).toFixed(0) : 92}%</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Top Confidence Score</span>
-                </div>
-                <div className="glass-panel p-4 flex flex-col gap-1 rounded-lg border border-slate-800 bg-[#0b0f19]">
-                  <span className="text-sm font-black text-amber-400 pt-1.5">Medium</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Blast Radius Detected</span>
-                </div>
-                <div className="glass-panel p-4 flex flex-col gap-1 rounded-lg border border-slate-800 bg-[#0b0f19]">
-                  <span className="text-xl font-black text-blue-400">2</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Recommended Actions</span>
-                </div>
-                <div className="glass-panel p-4 flex flex-col gap-1 rounded-lg border border-slate-800 bg-[#0b0f19]">
-                  <span className="text-sm font-black text-red-400 pt-1.5">High</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Business Impact Detected</span>
+                <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-3.5 py-2 rounded-xl text-[10px] text-slate-400">
+                  <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                  <span>AI RCA Generated at {getRcaGeneratedTime()}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right 4-columns: Sidebar summary & timeline */}
-          <div className="lg:col-span-4 flex flex-col gap-6 w-full">
+          {/* Right sidebar details */}
+          <div className="flex flex-col gap-6">
             {/* Incident Summary Card */}
-            <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-[#0e1322]/40 backdrop-blur-sm flex flex-col gap-4">
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-2 flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-slate-400" />
-                Incident Summary
-              </h3>
-              <div className="flex flex-col gap-3 text-xs">
-                <div className="flex justify-between">
+            <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex flex-col gap-4 shadow-lg">
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <FileText className="w-4 h-4 text-purple-400" />
+                <h3 className="text-xs font-extrabold text-slate-100 uppercase tracking-widest">Incident Summary</h3>
+              </div>
+
+              <div className="flex flex-col gap-3.5 text-xs">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-400">Incident ID</span>
-                  <span className="font-mono text-slate-200">{activeIncident.id.slice(0, 18)}</span>
+                  <span className="font-mono font-semibold text-slate-200">{activeIncident.id}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">Severity</span>
-                  <SeverityBadge severity={activeIncident.severity} />
+                  <span className="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] font-bold uppercase">
+                    {activeIncident.severity}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">Service</span>
-                  <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-semibold">{primaryService}</span>
+                  <span className="px-2 py-0.5 rounded bg-blue-500/15 border border-blue-500/20 text-blue-400 text-[10px] font-bold">
+                    {primaryService}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">Environment</span>
-                  <span className="px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 font-semibold">Production</span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                    Production
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-400">Created Time</span>
-                  <span className="text-slate-200">{formatTimestamp(activeIncident.created_at)}</span>
+                  <span className="font-semibold text-slate-300">{formatTimestamp(activeIncident.created_at)}</span>
                 </div>
-                <div className="flex justify-between items-center border-t border-slate-800 pt-2.5">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-400">Current Status</span>
-                  <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-500 font-bold uppercase text-[9px] tracking-wide border border-amber-500/20">
+                  <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-bold uppercase">
                     Pending Approval
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Timeline checklist Card */}
-            <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-[#0e1322]/40 backdrop-blur-sm flex flex-col gap-4">
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-2 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-slate-400" />
-                Timeline Flow
-              </h3>
-              
-              <div className="flex flex-col gap-4 pl-2 relative before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-800">
-                {/* Node 1: Created */}
-                <div className="flex gap-4 items-start relative">
-                  <div className="z-10 w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Check className="w-4 h-4 font-black" />
+            {/* Timeline Checklist Card */}
+            <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex flex-col gap-4 shadow-lg">
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <Clock className="w-4 h-4 text-purple-400" />
+                <h3 className="text-xs font-extrabold text-slate-100 uppercase tracking-widest">Timeline</h3>
+              </div>
+
+              {/* Progress Vertical Flow */}
+              <div className="relative pl-6 flex flex-col gap-6">
+                <div className="absolute left-2.5 top-1.5 bottom-1.5 w-0.5 bg-slate-800"></div>
+
+                {/* Step 1: Created */}
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.5)]">
+                    <Check className="w-2 h-2 text-white" />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-200">Incident Created</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{formatTimestamp(activeIncident.created_at)}</p>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-slate-200">Incident Created</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">{formatTimestamp(activeIncident.created_at)}</span>
                   </div>
                 </div>
 
-                {/* Node 2: RCA Generated */}
-                <div className="flex gap-4 items-start relative">
-                  <div className="z-10 w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Check className="w-4 h-4 font-black" />
+                {/* Step 2: AI RCA Generated */}
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.5)]">
+                    <Check className="w-2 h-2 text-white" />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-200">AI RCA Generated</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      {activeIncident.timeline.find(t => t.event_type === 'agent_milestone')?.timestamp 
-                        ? formatTimestamp(activeIncident.timeline.find(t => t.event_type === 'agent_milestone')!.timestamp) 
-                        : formatTimestamp(activeIncident.created_at)}
-                    </p>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-slate-200">AI RCA Generated</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">{getRcaGeneratedTime()}</span>
                   </div>
                 </div>
 
-                {/* Node 3: Pending */}
-                <div className="flex gap-4 items-start relative">
-                  <div className="z-10 w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500 text-amber-500 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.3)]">
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></div>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-amber-500">Pending Escalation Approval</h4>
-                    <p className="text-[10px] text-amber-500/80 mt-0.5">Waiting for operator action</p>
+                {/* Step 3: Pending Escalation Approval */}
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse"></div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-amber-500">Pending Escalation Approval</span>
+                    <span className="text-[10px] text-slate-450 mt-0.5">Waiting for operator action</span>
                   </div>
                 </div>
 
-                {/* Node 4: Slack */}
-                <div className="flex gap-4 items-start relative">
-                  <div className="z-10 w-7 h-7 rounded-full bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-slate-700"></div>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-500">Escalation Sent to Slack</h4>
-                    <p className="text-[10px] text-slate-600 mt-0.5">-</p>
+                {/* Step 4: Escalation Sent */}
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full bg-slate-800"></div>
+                  <div className="flex flex-col text-slate-500">
+                    <span className="text-xs font-bold">Escalation Sent to Slack</span>
+                    <span className="text-[10px] mt-0.5">-</span>
                   </div>
                 </div>
 
-                {/* Node 5: Resolved */}
-                <div className="flex gap-4 items-start relative">
-                  <div className="z-10 w-7 h-7 rounded-full bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-slate-700"></div>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-500">Incident Resolved</h4>
-                    <p className="text-[10px] text-slate-600 mt-0.5">-</p>
+                {/* Step 5: Incident Resolved */}
+                <div className="relative">
+                  <div className="absolute -left-5 top-0.5 w-3 h-3 rounded-full bg-slate-800"></div>
+                  <div className="flex flex-col text-slate-500">
+                    <span className="text-xs font-bold">Incident Resolved</span>
+                    <span className="text-[10px] mt-0.5">-</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom statistics panel */}
+        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-6 flex flex-col gap-4 shadow-lg">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <h3 className="text-xs font-extrabold text-slate-100 uppercase tracking-widest">Full AI RCA Summary</h3>
+            </div>
+            <Link to="/rca" className="text-xs text-primary hover:underline flex items-center gap-1 font-bold">
+              View Full RCA Report <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* Stat 1 */}
+            <div className="bg-[#070D19] border border-slate-850 p-4 rounded-xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0">
+                <Brain className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold text-slate-100 leading-none">{activeIncident.hypotheses.length || 3}</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Hypotheses</span>
+              </div>
+            </div>
+
+            {/* Stat 2 */}
+            <div className="bg-[#070D19] border border-slate-850 p-4 rounded-xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold text-slate-100 leading-none">{Math.round(topHypothesis.confidence_score * 100)}%</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Top Confidence</span>
+              </div>
+            </div>
+
+            {/* Stat 3 */}
+            <div className="bg-[#070D19] border border-slate-850 p-4 rounded-xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold text-slate-100 leading-none">Medium</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Blast Radius</span>
+              </div>
+            </div>
+
+            {/* Stat 4 */}
+            <div className="bg-[#070D19] border border-slate-850 p-4 rounded-xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                <FileCheck2 className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold text-slate-100 leading-none">2</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Actions</span>
+              </div>
+            </div>
+
+            {/* Stat 5 */}
+            <div className="bg-[#070D19] border border-slate-850 p-4 rounded-xl flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold text-slate-100 leading-none">High</span>
+                <span className="text-[10px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">Business Impact</span>
               </div>
             </div>
           </div>
@@ -441,16 +516,19 @@ export const IncidentDetailPage: React.FC = () => {
     );
   }
 
+  // ==========================================
+  // STANDARD WORKSPACE TRIAGE VIEW (Premium Redesign)
+  // ==========================================
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <div className="flex flex-col gap-6 w-full text-slate-100 select-none animate-fadeIn">
       {/* Top Breadcrumb toolbar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-4">
-        <div className="flex flex-col gap-2">
-          <Link to="/" className="text-xs text-slate-400 hover:text-primary transition-colors flex items-center gap-1">
+      <div className="bg-[#0D1830]/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg">
+        <div className="flex flex-col gap-1.5">
+          <Link to="/" className="text-[10px] text-primary hover:text-slate-200 transition-colors flex items-center gap-1 uppercase tracking-widest font-extrabold">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Triage Workbench
           </Link>
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-slate-100">Incident Triage: {activeIncident.id.slice(0, 8)}...</h2>
+          <div className="flex items-center gap-3 mt-1.5">
+            <h2 className="text-lg font-extrabold font-sans tracking-tight">Incident Triage: {activeIncident.id.slice(0, 8)}...</h2>
             <SeverityBadge severity={activeIncident.severity} />
           </div>
         </div>
@@ -458,14 +536,14 @@ export const IncidentDetailPage: React.FC = () => {
         {isOpen ? (
           <button
             onClick={handleResolve}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-slate-100 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+            className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-slate-100 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-[0_0_12px_rgba(239,68,68,0.25)]"
           >
             <ShieldCheck className="w-4 h-4" />
             Resolve Incident & Generate RCA
           </button>
         ) : (
-          <span className="px-3 py-1.5 rounded-lg bg-success/15 border border-success/30 text-success text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4" />
+          <span className="px-3.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-450 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.1)]">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
             Incident Resolved
           </span>
         )}
@@ -475,13 +553,13 @@ export const IncidentDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         
         {/* Left column: Telemetry Enriched Data */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 border-b border-border">
+        <div className="flex flex-col gap-4 border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 shadow-lg min-h-[500px]">
+          <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3">
             <button
               onClick={() => setLeftTab('metrics')}
-              className={`pb-2 px-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all flex items-center gap-1.5
+              className={`pb-2 px-3 text-xs font-extrabold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5
                 ${leftTab === 'metrics' 
-                  ? 'border-primary text-primary' 
+                  ? 'border-purple-500 text-purple-400' 
                   : 'border-transparent text-slate-400 hover:text-slate-200'
                 }
               `}
@@ -491,9 +569,9 @@ export const IncidentDetailPage: React.FC = () => {
             </button>
             <button
               onClick={() => setLeftTab('logs')}
-              className={`pb-2 px-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all flex items-center gap-1.5
+              className={`pb-2 px-3 text-xs font-extrabold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5
                 ${leftTab === 'logs' 
-                  ? 'border-primary text-primary' 
+                  ? 'border-purple-500 text-purple-400' 
                   : 'border-transparent text-slate-400 hover:text-slate-200'
                 }
               `}
@@ -503,7 +581,7 @@ export const IncidentDetailPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="min-h-[400px]">
+          <div className="flex-1 mt-2">
             {leftTab === 'metrics' ? (
               <TelemetryGraphs service={primaryService} />
             ) : (
@@ -513,13 +591,13 @@ export const IncidentDetailPage: React.FC = () => {
         </div>
 
         {/* Right column: Reasoning & Graph nodes */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2 border-b border-border">
+        <div className="flex flex-col gap-4 border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 shadow-lg min-h-[500px]">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-800/80 pb-3">
             <button
               onClick={() => setRightTab('hypotheses')}
-              className={`pb-2 px-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all flex items-center gap-1.5
+              className={`pb-2 px-3 text-xs font-extrabold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5
                 ${rightTab === 'hypotheses' 
-                  ? 'border-primary text-primary' 
+                  ? 'border-purple-500 text-purple-400' 
                   : 'border-transparent text-slate-400 hover:text-slate-200'
                 }
               `}
@@ -529,9 +607,9 @@ export const IncidentDetailPage: React.FC = () => {
             </button>
             <button
               onClick={() => setRightTab('timeline')}
-              className={`pb-2 px-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all flex items-center gap-1.5
+              className={`pb-2 px-3 text-xs font-extrabold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5
                 ${rightTab === 'timeline' 
-                  ? 'border-primary text-primary' 
+                  ? 'border-purple-500 text-purple-400' 
                   : 'border-transparent text-slate-400 hover:text-slate-200'
                 }
               `}
@@ -541,9 +619,9 @@ export const IncidentDetailPage: React.FC = () => {
             </button>
             <button
               onClick={() => setRightTab('topology')}
-              className={`pb-2 px-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all flex items-center gap-1.5
+              className={`pb-2 px-3 text-xs font-extrabold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5
                 ${rightTab === 'topology' 
-                  ? 'border-primary text-primary' 
+                  ? 'border-purple-500 text-purple-400' 
                   : 'border-transparent text-slate-400 hover:text-slate-200'
                 }
               `}
@@ -554,9 +632,9 @@ export const IncidentDetailPage: React.FC = () => {
             {!isOpen && (
               <button
                 onClick={() => setRightTab('rca')}
-                className={`pb-2 px-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all flex items-center gap-1.5
+                className={`pb-2 px-3 text-xs font-extrabold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5
                   ${rightTab === 'rca' 
-                    ? 'border-primary text-primary' 
+                    ? 'border-purple-500 text-purple-400' 
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                   }
                 `}
@@ -567,7 +645,7 @@ export const IncidentDetailPage: React.FC = () => {
             )}
           </div>
 
-          <div className="min-h-[400px]">
+          <div className="flex-1 mt-2">
             {rightTab === 'hypotheses' && (
               <HypothesisPanel hypotheses={activeIncident.hypotheses} />
             )}
