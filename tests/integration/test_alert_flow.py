@@ -134,4 +134,4 @@ def test_alert_ingest_e2e_flow(
     updated_incident = saved_incidents[incident_id_1]
     assert len(updated_incident.alerts) == 2
     assert updated_incident.alerts[1].name == "DBConnectionPoolExhausted"
-    assert len(updated_incident.timeline) == 2
+    assert len(updated_incident.timeline) == 3

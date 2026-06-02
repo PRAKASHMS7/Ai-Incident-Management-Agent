@@ -78,8 +78,9 @@ async def test_slack_channel_routing():
         mock_r.hget.return_value = None
         mock_get_redis.return_value = mock_r
 
+        from src.config import settings
         target = await client.get_routing_channel("unknown-service")
-        assert target == "mock_channel"  # default settings.SLACK_CHANNEL
+        assert target == settings.SLACK_CHANNEL  # default settings.SLACK_CHANNEL
 
     # 2. Mapping exists in Redis: returns service specific channel
     with patch("src.database.redis_client.redis_manager.get_client") as mock_get_redis:

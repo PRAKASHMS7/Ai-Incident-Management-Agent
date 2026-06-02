@@ -20,6 +20,8 @@ from src.api.schemas import (
     IncidentStateModel,
     TopologyLoadPayload,
     RcaUpdatePayload,
+    EscalationApprovePayload,
+    TimelineItem,
 )
 from src.database.redis_client import redis_manager
 from src.database.neo4j_client import neo4j_manager
@@ -28,21 +30,29 @@ from src.services import RCAGenerator
 from slack_bolt.adapter.fastapi.async_handler import AsyncSlackRequestHandler
 from src.services.slack_client import slack_app
 
+from opentelemetry import context
+from src.observability.tracer import tracer
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-async def run_incident_workflow(incident_id: str):
+async def run_incident_workflow(incident_id: str, parent_context: context.Context = None):
     """
     Asynchronously invokes the LangGraph reasoning workflow for the newly created incident.
     """
+    token = None
+    if parent_context:
+        token = context.attach(parent_context)
     try:
         from src.graph.workflow import compiled_workflow
         config = {"configurable": {"thread_id": incident_id}}
         logger.info("Executing LangGraph reasoning workflow for incident %s", incident_id)
-        await compiled_workflow.ainvoke({"incident_id": incident_id}, config=config)
-        logger.info("LangGraph reasoning workflow completed for incident %s", incident_id)
+        with tracer.start_as_current_span("langgraph.workflow") as span:
+            span.set_attribute("incident.id", incident_id)
+            await compiled_workflow.ainvoke({"incident_id": incident_id}, config=config)
+            logger.info("LangGraph reasoning workflow completed for incident %s", incident_id)
     except Exception as e:
         logger.error(
             "Failed to run LangGraph reasoning workflow for incident %s: %s",
@@ -50,6 +60,9 @@ async def run_incident_workflow(incident_id: str):
             str(e),
             exc_info=True,
         )
+    finally:
+        if token:
+            context.detach(token)
 
 
 @router.post("/alerts", status_code=status.HTTP_202_ACCEPTED)
@@ -68,6 +81,7 @@ def ingest_alerts(
     )
     processed_count = 0
     incidents_mapped = []
+    curr_context = context.get_current()
 
     for raw_alert in payload.alerts:
         labels = raw_alert.labels
@@ -126,7 +140,7 @@ def ingest_alerts(
             if action == "created":
                 import sys
                 if "pytest" not in sys.modules:
-                    background_tasks.add_task(run_incident_workflow, incident_id)
+                    background_tasks.add_task(run_incident_workflow, incident_id, curr_context)
         except Exception as e:
             logger.error(
                 "Failed to correlate alert %s: %s", alert_id, str(e), exc_info=True
@@ -528,6 +542,137 @@ def get_rca_metadata_json(id: str) -> Dict[str, Any]:
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"RCA report JSON for incident {id} not found.",
     )
+
+
+@router.get("/incidents/{id}/channels", status_code=status.HTTP_200_OK)
+def get_incident_channels(id: str) -> List[str]:
+    """
+    Returns available Slack channels for incident routing.
+    """
+    try:
+        redis_client = redis_manager.get_client()
+        # Fetch all channels registered in the routing configuration
+        channels = redis_client.hvals("slack:channel_routing")
+        if channels:
+            # Decode bytes if needed
+            decoded_channels = []
+            for ch in channels:
+                if isinstance(ch, bytes):
+                    decoded_channels.append(ch.decode("utf-8"))
+                else:
+                    decoded_channels.append(str(ch))
+            # Return unique list of channels preserving order
+            unique_channels = list(dict.fromkeys(decoded_channels))
+            if unique_channels:
+                return unique_channels
+    except Exception as e:
+        logger.warning("Failed to fetch Slack channels from Redis routing table: %s", str(e))
+
+    # Fallback to settings.SLACK_CHANNEL
+    from src.config import settings
+    return [settings.SLACK_CHANNEL]
+
+
+@router.post("/incidents/{id}/approve", status_code=status.HTTP_200_OK)
+async def approve_incident_escalation(
+    id: str,
+    payload: EscalationApprovePayload,
+    operator_name: str = "operator",
+) -> Dict[str, Any]:
+    """
+    Approves the AI incident RCA and dispatches it to the chosen Slack channel.
+    """
+    incident = redis_manager.get_incident(id)
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Incident {id} not found"
+        )
+    if incident.state != "pending_approval":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Incident {id} is in state '{incident.state}', expected 'pending_approval'.",
+        )
+
+    approved_time = datetime.now(timezone.utc)
+    incident.state = "escalated"
+    incident.approved_by = operator_name
+    incident.approved_at = approved_time
+    incident.updated_at = approved_time
+
+    # Add timeline record
+    incident.timeline.append(
+        TimelineItem(
+            timestamp=approved_time,
+            event_type="operator_action",
+            source="slack_operator",
+            message=f"Incident escalation approved by @{operator_name} to channel {payload.channel}.",
+            severity="info",
+            metadata={
+                "approved_by": operator_name,
+                "approved_at": approved_time.isoformat(),
+                "notes": payload.notes or "",
+                "channel": payload.channel,
+            },
+        )
+    )
+
+    # Save to Redis before posting to Slack (so Slack card builder has access to update hypotheses/timeline)
+    redis_manager.save_incident(incident)
+
+    # Dispatch via slack client
+    from src.services.slack_client import slack_client
+
+    await slack_client.post_escalation_card(
+        incident_id=id, channel=payload.channel, operator_notes=payload.notes
+    )
+
+    # Re-retrieve incident state to get any updates recorded by the Slack dispatcher
+    final_incident = redis_manager.get_incident(id) or incident
+    return final_incident.model_dump()
+
+
+@router.post("/incidents/{id}/reject", status_code=status.HTTP_200_OK)
+async def reject_incident_escalation(
+    id: str,
+    operator_name: str = "operator",
+) -> Dict[str, Any]:
+    """
+    Rejects the incident escalation, updating state to approval_rejected.
+    """
+    incident = redis_manager.get_incident(id)
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Incident {id} not found"
+        )
+    if incident.state != "pending_approval":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Incident {id} is in state '{incident.state}', expected 'pending_approval'.",
+        )
+
+    rejected_time = datetime.now(timezone.utc)
+    incident.state = "approval_rejected"
+    incident.rejected_by = operator_name
+    incident.rejected_at = rejected_time
+    incident.updated_at = rejected_time
+
+    # Add timeline record
+    incident.timeline.append(
+        TimelineItem(
+            timestamp=rejected_time,
+            event_type="operator_action",
+            source="slack_operator",
+            message=f"Incident escalation rejected by @{operator_name}.",
+            severity="warning",
+            metadata={
+                "rejected_by": operator_name,
+                "rejected_at": rejected_time.isoformat(),
+            },
+        )
+    )
+
+    redis_manager.save_incident(incident)
+    return incident.model_dump()
 
 
 # Slack Webhook endpoint callback router

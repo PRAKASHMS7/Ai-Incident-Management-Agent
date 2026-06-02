@@ -198,7 +198,12 @@ class SlackClient:
                 raise e
 
     # 4. Escalation Dispatcher
-    async def post_escalation_card(self, incident_id: str) -> Optional[Dict[str, Any]]:
+    async def post_escalation_card(
+        self, 
+        incident_id: str, 
+        channel: Optional[str] = None, 
+        operator_notes: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Main SRE entry point for graph nodes to post Block Kit alerts.
         """
@@ -218,21 +223,24 @@ class SlackClient:
                 return None
 
             # Determine target channel
-            primary_service = (
-                incident.services_affected[0]
-                if incident.services_affected
-                else "default"
-            )
-            target_channel = await self.get_routing_channel(primary_service)
-
-            # Warning alerts routed to staging channel
-            if incident.state == "open" and incident.severity == "warning":
-                target_channel = f"{target_channel}-staging"
-                logger.info(
-                    "Routing Warning incident %s to staging approval channel: %s",
-                    incident_id,
-                    target_channel,
+            if channel:
+                target_channel = channel
+            else:
+                primary_service = (
+                    incident.services_affected[0]
+                    if incident.services_affected
+                    else "default"
                 )
+                target_channel = await self.get_routing_channel(primary_service)
+
+                # Warning alerts routed to staging channel
+                if incident.state == "open" and incident.severity == "warning":
+                    target_channel = f"{target_channel}-staging"
+                    logger.info(
+                        "Routing Warning incident %s to staging approval channel: %s",
+                        incident_id,
+                        target_channel,
+                    )
 
             # Assemble blocks
             blocks = [
@@ -244,8 +252,17 @@ class SlackClient:
                 self.hypotheses_block(incident.hypotheses),
             ]
 
+            if operator_notes:
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Additional Escalation Context:*\n{operator_notes}"
+                    }
+                })
+
             # Include actions buttons only if not resolved yet
-            if incident.state in ["open", "analyzing", "awaiting_approval"]:
+            if incident.state in ["open", "analyzing", "awaiting_approval", "pending_approval"]:
                 blocks.append(self.actions_block(incident.id))
 
             try:

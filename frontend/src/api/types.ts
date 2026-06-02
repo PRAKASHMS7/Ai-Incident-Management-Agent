@@ -28,7 +28,7 @@ export interface TimelineItem {
 
 export interface IncidentStateModel {
   id: string;
-  state: 'open' | 'analyzing' | 'awaiting_approval' | 'escalated' | 'resolved' | 'merged';
+  state: 'open' | 'analyzing' | 'pending_approval' | 'approval_rejected' | 'escalated' | 'resolved' | 'merged';
   severity: 'critical' | 'warning' | 'info';
   services_affected: string[];
   primary_incident_alert_id: string;
@@ -39,6 +39,10 @@ export interface IncidentStateModel {
   updated_at: string;
   merged_into?: string | null;
   rca_document_url?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  rejected_by?: string | null;
+  rejected_at?: string | null;
 }
 
 export interface RcaReport {

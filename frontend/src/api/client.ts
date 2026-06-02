@@ -28,6 +28,9 @@ interface IncidentStore {
   resolveIncident: (id: string, operatorName?: string) => Promise<void>;
   fetchSystemHealth: () => Promise<void>;
   setActiveIncident: (incident: IncidentStateModel | null) => void;
+  fetchChannels: (id: string) => Promise<string[]>;
+  approveEscalation: (id: string, channel: string, notes: string, operatorName?: string) => Promise<void>;
+  rejectEscalation: (id: string, operatorName?: string) => Promise<void>;
 }
 
 export const useIncidentStore = create<IncidentStore>((set, get) => ({
@@ -92,7 +95,48 @@ export const useIncidentStore = create<IncidentStore>((set, get) => ({
     }
   },
 
-  setActiveIncident: (incident) => set({ activeIncident: incident })
+  setActiveIncident: (incident) => set({ activeIncident: incident }),
+
+  fetchChannels: async (id: string) => {
+    try {
+      const res = await api.get<string[]>(`/incidents/${id}/channels`);
+      return res.data;
+    } catch (err: any) {
+      set({ error: err.message || `Failed to fetch channels for incident ${id}` });
+      return [];
+    }
+  },
+
+  approveEscalation: async (id: string, channel: string, notes: string, operatorName = 'Prakash') => {
+    try {
+      const res = await api.post<IncidentStateModel>(
+        `/incidents/${id}/approve?operator_name=${operatorName}`,
+        { channel, notes }
+      );
+      set((state) => ({
+        activeIncident: state.activeIncident?.id === id ? res.data : state.activeIncident,
+        incidents: state.incidents.map((inc) => (inc.id === id ? res.data : inc)),
+        error: null
+      }));
+    } catch (err: any) {
+      set({ error: err.message || `Failed to approve escalation for incident ${id}` });
+    }
+  },
+
+  rejectEscalation: async (id: string, operatorName = 'Prakash') => {
+    try {
+      const res = await api.post<IncidentStateModel>(
+        `/incidents/${id}/reject?operator_name=${operatorName}`
+      );
+      set((state) => ({
+        activeIncident: state.activeIncident?.id === id ? res.data : state.activeIncident,
+        incidents: state.incidents.map((inc) => (inc.id === id ? res.data : inc)),
+        error: null
+      }));
+    } catch (err: any) {
+      set({ error: err.message || `Failed to reject escalation for incident ${id}` });
+    }
+  }
 }));
 
 // Polling custom hook

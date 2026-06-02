@@ -144,7 +144,7 @@ async def test_workflow_e2e_success_path(
     # Verify finalized Redis state
     updated_inc = redis_manager.get_incident("inc-e2e-ok")
     assert updated_inc is not None
-    assert updated_inc.state == "escalated"
+    assert updated_inc.state == "pending_approval"
     assert len(updated_inc.hypotheses) == 3
     assert any(item.event_type == "agent_milestone" for item in updated_inc.timeline)
 
@@ -224,4 +224,4 @@ async def test_workflow_checkpoint_recovery_and_resume(
 
     # Verify finalized incident in db
     updated_inc = redis_manager.get_incident("inc-crash-recover")
-    assert updated_inc.state == "escalated"
+    assert updated_inc.state == "pending_approval"

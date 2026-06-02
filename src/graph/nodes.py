@@ -18,6 +18,8 @@ from src.database.redis_client import redis_manager
 from src.database.neo4j_client import neo4j_manager
 from src.services import prom_client, loki_client, groq_client
 from src.observability.metrics import fallback_diagnostics_total
+from src.observability.tracer import tracer
+from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 
@@ -70,26 +72,29 @@ class WorkflowNodes:
         """
         Reads the triggering incident details from Redis and sets up the initial state.
         """
-        incident_id = cast(str, state.get("incident_id"))
-        logger.info("Node [InitializeState] starting for incident: %s", incident_id)
+        with tracer.start_as_current_span("langgraph.node.initialize_state") as span:
+            incident_id = cast(str, state.get("incident_id"))
+            span.set_attribute("incident.id", incident_id)
+            logger.info("Node [InitializeState] starting for incident: %s", incident_id)
 
-        incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
-        if not incident:
-            logger.error("Incident %s not found in Redis state. Halting.", incident_id)
-            return {"state": "failed"}
+            incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
+            if not incident:
+                logger.error("Incident %s not found in Redis state. Halting.", incident_id)
+                span.set_status(trace.StatusCode.ERROR, f"Incident {incident_id} not found in Redis")
+                return {"state": "failed"}
 
-        return {
-            "incident_id": incident.id,
-            "state": "analyzing",
-            "services_affected": list(incident.services_affected),
-            "raw_alerts": incident.alerts,
-            "collected_metrics": {},
-            "collected_logs": {},
-            "retry_count": 0,
-            "validation_error_message": None,
-            "timeline": incident.timeline,
-            "hypotheses": [],
-        }
+            return {
+                "incident_id": incident.id,
+                "state": "analyzing",
+                "services_affected": list(incident.services_affected),
+                "raw_alerts": incident.alerts,
+                "collected_metrics": {},
+                "collected_logs": {},
+                "retry_count": 0,
+                "validation_error_message": None,
+                "timeline": incident.timeline,
+                "hypotheses": [],
+            }
 
     @staticmethod
     async def fetch_topology(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -97,71 +102,83 @@ class WorkflowNodes:
         Traverses the Neo4j dependency graph to find direct upstreams/downstreams
         for all affected services, creating an expanded list for metrics/logs collection.
         """
-        logger.info(
-            "Node [FetchTopology] executing for incident: %s", state.get("incident_id")
-        )
-        services = state.get("services_affected", [])
-        expanded = set(services)
+        with tracer.start_as_current_span("langgraph.node.fetch_topology") as span:
+            incident_id = state.get("incident_id")
+            span.set_attribute("incident.id", incident_id or "")
+            logger.info(
+                "Node [FetchTopology] executing for incident: %s", incident_id
+            )
+            services = state.get("services_affected", [])
+            expanded = set(services)
 
-        # Traverse neighbors (depth = 1) for each service using asyncio.to_thread
-        for svc in services:
-            try:
-                upstreams = await asyncio.to_thread(neo4j_manager.get_upstreams, svc)
-                downstreams_raw = await asyncio.to_thread(
-                    neo4j_manager.get_downstreams, svc
-                )
-                downstreams = [
-                    d["name"] for d in downstreams_raw if d["type"] == "Service"
-                ]
+            # Traverse neighbors (depth = 1) for each service using asyncio.to_thread
+            for svc in services:
+                try:
+                    upstreams = await asyncio.to_thread(neo4j_manager.get_upstreams, svc)
+                    downstreams_raw = await asyncio.to_thread(
+                        neo4j_manager.get_downstreams, svc
+                    )
+                    downstreams = [
+                        d["name"] for d in downstreams_raw if d["type"] == "Service"
+                    ]
 
-                expanded.update(upstreams)
-                expanded.update(downstreams)
-            except Exception as e:
-                logger.warning(
-                    "Could not fetch dependency neighbors for %s: %s", svc, str(e)
-                )
+                    expanded.update(upstreams)
+                    expanded.update(downstreams)
+                except Exception as e:
+                    logger.warning(
+                        "Could not fetch dependency neighbors for %s: %s", svc, str(e)
+                    )
+                    span.record_exception(e)
 
-        logger.info("Expanded analysis scope services: %s", list(expanded))
-        return {"expanded_topology_services": list(expanded)}
+            logger.info("Expanded analysis scope services: %s", list(expanded))
+            return {"expanded_topology_services": list(expanded)}
 
     @staticmethod
     async def gather_telemetry(state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Queries Prometheus and Loki concurrently for all expanded services.
         """
-        logger.info(
-            "Node [GatherTelemetry] executing for incident: %s",
-            state.get("incident_id"),
-        )
-        services = state.get("expanded_topology_services", [])
-        raw_alerts = state.get("raw_alerts", [])
+        with tracer.start_as_current_span("langgraph.node.gather_telemetry") as span:
+            incident_id = state.get("incident_id")
+            span.set_attribute("incident.id", incident_id or "")
+            logger.info(
+                "Node [GatherTelemetry] executing for incident: %s",
+                incident_id,
+            )
+            services = state.get("expanded_topology_services", [])
+            raw_alerts = state.get("raw_alerts", [])
 
-        # Find time boundary around the earliest alert trigger time
-        if raw_alerts:
-            earliest_time = min([a.starts_at for a in raw_alerts])
-        else:
-            earliest_time = datetime.now(timezone.utc)
+            # Find time boundary around the earliest alert trigger time
+            if raw_alerts:
+                earliest_time = min([a.starts_at for a in raw_alerts])
+            else:
+                earliest_time = datetime.now(timezone.utc)
 
-        starts_at = earliest_time - timedelta(minutes=5)
-        ends_at = earliest_time + timedelta(minutes=5)
+            starts_at = earliest_time - timedelta(minutes=5)
+            ends_at = earliest_time + timedelta(minutes=5)
 
-        all_tasks = []
-        # Concurrently query Prometheus and Loki in parallel
-        for svc in services:
-            all_tasks.append(prom_client.get_metrics(svc, starts_at, ends_at))
-        for svc in services:
-            all_tasks.append(loki_client.get_logs(svc, starts_at, ends_at))
+            all_tasks = []
+            # Concurrently query Prometheus and Loki in parallel
+            for svc in services:
+                all_tasks.append(prom_client.get_metrics(svc, starts_at, ends_at))
+            for svc in services:
+                all_tasks.append(loki_client.get_logs(svc, starts_at, ends_at))
 
-        results = await asyncio.gather(*all_tasks)
+            try:
+                results = await asyncio.gather(*all_tasks)
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise e
 
-        n_svc = len(services)
-        collected_metrics = {services[i]: results[i] for i in range(n_svc)}
-        collected_logs = {services[i]: results[n_svc + i] for i in range(n_svc)}
+            n_svc = len(services)
+            collected_metrics = {services[i]: results[i] for i in range(n_svc)}
+            collected_logs = {services[i]: results[n_svc + i] for i in range(n_svc)}
 
-        return {
-            "collected_metrics": collected_metrics,
-            "collected_logs": collected_logs,
-        }
+            return {
+                "collected_metrics": collected_metrics,
+                "collected_logs": collected_logs,
+            }
 
     @staticmethod
     async def llm_reasoning(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -169,273 +186,314 @@ class WorkflowNodes:
         Sends aggregated context to Llama 3.1 70B via Groq API.
         Handles context assembly, JSON parsing, Pydantic schema validation, and fallback modes.
         """
-        incident_id = state.get("incident_id")
-        retry_count = state.get("retry_count", 0)
-        logger.info(
-            "Node [LLMReasoning] starting (attempt %d) for incident: %s",
-            retry_count + 1,
-            incident_id,
-        )
-
-        # Check primary alert name for mock/testing triggers
-        trigger_alert_name = ""
-        raw_alerts = state.get("raw_alerts", [])
-        if raw_alerts:
-            trigger_alert_name = raw_alerts[0].name
-
-        # ----------------------------------------------------
-        # TEST LOOP TRIGGERS (Self-Correction/Fallback Testing)
-        # ----------------------------------------------------
-        if trigger_alert_name == "TestCrashAlert":
-            client = redis_manager.get_client()
-            crash_key = f"test:crashed:{incident_id}"
-            if not client.get(crash_key):
-                client.set(crash_key, "1", ex=60)
-                logger.info("Simulating database crash error for TestCrashAlert")
-                raise ValueError("Database error!")
-            logger.info("Resuming TestCrashAlert execution successfully.")
-
-        if trigger_alert_name == "TestRetryLoopAlert" and retry_count == 0:
+        with tracer.start_as_current_span("langgraph.node.llm_reasoning") as span:
+            incident_id = state.get("incident_id")
+            retry_count = state.get("retry_count", 0)
+            span.set_attribute("incident.id", incident_id or "")
+            span.set_attribute("retry_count", retry_count)
             logger.info(
-                "Simulating malformed JSON output for TestRetryLoopAlert (attempt 0)"
-            )
-            return {
-                "validation_error_message": "Malformed JSON structure: incomplete closing brackets."
-            }
-
-        if trigger_alert_name == "TestFallbackAlert" and retry_count < 3:
-            logger.info(
-                "Simulating persistent JSON failure for TestFallbackAlert (attempt %d)",
-                retry_count,
-            )
-            return {
-                "validation_error_message": "Persistent model validation JSON exception."
-            }
-
-        # 1. Assemble context blocks
-        alerts_section = "=== ACTIVE ALERT EVENTS ===\n"
-        for alert in state.get("raw_alerts", []):
-            alerts_section += (
-                f"- Alert: {alert.name}\n"
-                f"  Service: {alert.service}\n"
-                f"  Severity: {alert.severity}\n"
-                f"  Trigger Time: {alert.starts_at.isoformat()}\n"
-                f"  Description: {alert.description}\n"
-            )
-
-        topology_section = "=== SERVICE DEPENDENCY GRAPH ===\n"
-        topology_section += (
-            f"Affected Services: {', '.join(state.get('services_affected', []))}\n"
-        )
-        topology_section += f"Analysis Scope Services: {', '.join(state.get('expanded_topology_services', []))}\n"
-        for svc in state.get("services_affected", []):
-            try:
-                upstreams = await asyncio.to_thread(neo4j_manager.get_upstreams, svc)
-                downstreams_raw = await asyncio.to_thread(
-                    neo4j_manager.get_downstreams, svc
-                )
-                downstreams = [d["name"] for d in downstreams_raw]
-                topology_section += (
-                    f"Service: {svc}\n"
-                    f"  - Upstreams (depend on this service): {upstreams}\n"
-                    f"  - Downstreams (this service depends on): {downstreams}\n"
-                )
-            except Exception as e:
-                logger.warning(
-                    "Could not append dependency paths for %s: %s", svc, str(e)
-                )
-
-        metrics_section = "=== PROMETHEUS METRIC SIGNALS ===\n"
-        for svc, summary in state.get("collected_metrics", {}).items():
-            metrics_section += f"{summary}\n\n"
-
-        logs_section = "=== LOKI CRITICAL LOG TRACES ===\n"
-        for svc, summary in state.get("collected_logs", {}).items():
-            logs_section += f"{summary}\n\n"
-
-        feedback_section = ""
-        if state.get("validation_error_message"):
-            feedback_section = (
-                "\n=== SELF-CORRECTION FEEDBACK ===\n"
-                f"Your previous output was invalid. Error: {state.get('validation_error_message')}\n"
-                "Please analyze the telemetry again, correct the formatting/schema mistakes, and output valid JSON matching the schema.\n"
-            )
-
-        user_prompt = (
-            f"{alerts_section}\n"
-            f"{topology_section}\n"
-            f"{metrics_section}\n"
-            f"{logs_section}\n"
-            f"{feedback_section}"
-        )
-
-        # 2. Query reasoning engine via groq_client
-        try:
-            raw_response = await groq_client.get_reasoning(
-                system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt
-            )
-
-            # Clean response of potential markdown wrappers
-            cleaned_response = raw_response.strip()
-            if cleaned_response.startswith("```json"):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.endswith("```"):
-                cleaned_response = cleaned_response[:-3]
-            cleaned_response = cleaned_response.strip()
-
-            # Validate JSON parses
-            parsed_json = json.loads(cleaned_response)
-
-            # Enforce schema validation via Pydantic
-            from src.api.schemas import ReasoningOutput
-
-            validated_output = ReasoningOutput.model_validate(parsed_json)
-
-            logger.info(
-                "LLM Reasoning succeeded and schema validated for incident: %s",
+                "Node [LLMReasoning] starting (attempt %d) for incident: %s",
+                retry_count + 1,
                 incident_id,
             )
-            return {
-                "validation_error_message": None,
-                "hypotheses": validated_output.hypotheses,
-            }
-        except json.JSONDecodeError as e:
-            logger.warning(
-                "LLM returned malformed JSON on incident %s: %s", incident_id, str(e)
+
+            # Check primary alert name for mock/testing triggers
+            trigger_alert_name = ""
+            raw_alerts = state.get("raw_alerts", [])
+            if raw_alerts:
+                trigger_alert_name = raw_alerts[0].name
+
+            # ----------------------------------------------------
+            # TEST LOOP TRIGGERS (Self-Correction/Fallback Testing)
+            # ----------------------------------------------------
+            if trigger_alert_name == "TestCrashAlert":
+                client = redis_manager.get_client()
+                crash_key = f"test:crashed:{incident_id}"
+                if not client.get(crash_key):
+                    client.set(crash_key, "1", ex=60)
+                    logger.info("Simulating database crash error for TestCrashAlert")
+                    err = ValueError("Database error!")
+                    span.record_exception(err)
+                    span.set_status(trace.StatusCode.ERROR, str(err))
+                    raise err
+                logger.info("Resuming TestCrashAlert execution successfully.")
+
+            if trigger_alert_name == "TestRetryLoopAlert" and retry_count == 0:
+                logger.info(
+                    "Simulating malformed JSON output for TestRetryLoopAlert (attempt 0)"
+                )
+                span.set_attribute("llm.validation_error", "Malformed JSON structure: incomplete closing brackets.")
+                return {
+                    "validation_error_message": "Malformed JSON structure: incomplete closing brackets."
+                }
+
+            if trigger_alert_name == "TestFallbackAlert" and retry_count < 3:
+                logger.info(
+                    "Simulating persistent JSON failure for TestFallbackAlert (attempt %d)",
+                    retry_count,
+                )
+                span.set_attribute("llm.validation_error", "Persistent model validation JSON exception.")
+                return {
+                    "validation_error_message": "Persistent model validation JSON exception."
+                }
+
+            # 1. Assemble context blocks
+            alerts_section = "=== ACTIVE ALERT EVENTS ===\n"
+            for alert in state.get("raw_alerts", []):
+                alerts_section += (
+                    f"- Alert: {alert.name}\n"
+                    f"  Service: {alert.service}\n"
+                    f"  Severity: {alert.severity}\n"
+                    f"  Trigger Time: {alert.starts_at.isoformat()}\n"
+                    f"  Description: {alert.description}\n"
+                )
+
+            topology_section = "=== SERVICE DEPENDENCY GRAPH ===\n"
+            topology_section += (
+                f"Affected Services: {', '.join(state.get('services_affected', []))}\n"
             )
-            return {
-                "validation_error_message": f"JSONDecodeError: Malformed JSON structure. Please output raw valid JSON only. Error details: {str(e)}"
-            }
-        except Exception as e:
-            # Pydantic validation error or API outage/timeout (after tenacity retries)
-            # Check if this was a failure to query Groq completely (e.g. outage)
-            if (
-                not isinstance(e, ValueError)
-                and "ValidationError" not in str(e)
-                and "ReasoningOutput" not in str(e)
-            ):
-                logger.error(
-                    "Groq reasoning engine failed completely: %s. Entering safety fallback mode.",
+            topology_section += f"Analysis Scope Services: {', '.join(state.get('expanded_topology_services', []))}\n"
+            for svc in state.get("services_affected", []):
+                try:
+                    upstreams = await asyncio.to_thread(neo4j_manager.get_upstreams, svc)
+                    downstreams_raw = await asyncio.to_thread(
+                        neo4j_manager.get_downstreams, svc
+                    )
+                    downstreams = [d["name"] for d in downstreams_raw]
+                    topology_section += (
+                        f"Service: {svc}\n"
+                        f"  - Upstreams (depend on this service): {upstreams}\n"
+                        f"  - Downstreams (this service depends on): {downstreams}\n"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Could not append dependency paths for %s: %s", svc, str(e)
+                    )
+                    span.record_exception(e)
+
+            metrics_section = "=== PROMETHEUS METRIC SIGNALS ===\n"
+            for svc, summary in state.get("collected_metrics", {}).items():
+                metrics_section += f"{summary}\n\n"
+
+            logs_section = "=== LOKI CRITICAL LOG TRACES ===\n"
+            for svc, summary in state.get("collected_logs", {}).items():
+                logs_section += f"{summary}\n\n"
+
+            feedback_section = ""
+            if state.get("validation_error_message"):
+                feedback_section = (
+                    "\n=== SELF-CORRECTION FEEDBACK ===\n"
+                    f"Your previous output was invalid. Error: {state.get('validation_error_message')}\n"
+                    "Please analyze the telemetry again, correct the formatting/schema mistakes, and output valid JSON matching the schema.\n"
+                )
+
+            user_prompt = (
+                f"{alerts_section}\n"
+                f"{topology_section}\n"
+                f"{metrics_section}\n"
+                f"{logs_section}\n"
+                f"{feedback_section}"
+            )
+
+            # 2. Query reasoning engine via groq_client
+            try:
+                raw_response = await groq_client.get_reasoning(
+                    system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt
+                )
+
+                # Clean response of potential markdown wrappers
+                cleaned_response = raw_response.strip()
+                if cleaned_response.startswith("```json"):
+                    cleaned_response = cleaned_response[7:]
+                if cleaned_response.endswith("```"):
+                    cleaned_response = cleaned_response[:-3]
+                cleaned_response = cleaned_response.strip()
+
+                # Validate JSON parses
+                parsed_json = json.loads(cleaned_response)
+
+                # Enforce schema validation via Pydantic
+                from src.api.schemas import ReasoningOutput
+
+                validated_output = ReasoningOutput.model_validate(parsed_json)
+
+                logger.info(
+                    "LLM Reasoning succeeded and schema validated for incident: %s",
+                    incident_id,
+                )
+                return {
+                    "validation_error_message": None,
+                    "hypotheses": validated_output.hypotheses,
+                }
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    "LLM returned malformed JSON on incident %s: %s", incident_id, str(e)
+                )
+                span.record_exception(e)
+                span.set_attribute("llm.validation_error", str(e))
+                return {
+                    "validation_error_message": f"JSONDecodeError: Malformed JSON structure. Please output raw valid JSON only. Error details: {str(e)}"
+                }
+            except Exception as e:
+                # Pydantic validation error or API outage/timeout (after tenacity retries)
+                # Check if this was a failure to query Groq completely (e.g. outage)
+                span.record_exception(e)
+                if (
+                    not isinstance(e, ValueError)
+                    and "ValidationError" not in str(e)
+                    and "ReasoningOutput" not in str(e)
+                ):
+                    logger.error(
+                        "Groq reasoning engine failed completely: %s. Entering safety fallback mode.",
+                        str(e),
+                    )
+                    span.set_status(trace.StatusCode.ERROR, f"Groq query failed: {str(e)}")
+                    fallback_diagnostics_total.inc()
+                    fallback = Hypothesis(
+                        rank=1,
+                        hypothesis="Safety Fallback Diagnostic: Groq AI Reasoning service is currently unreachable or timed out.",
+                        confidence_score=0.1,
+                        evidence=["API client connection exception"],
+                        recommended_action="Inspect Groq API status or check logs manually.",
+                    )
+                    return {"validation_error_message": None, "hypotheses": [fallback]}
+
+                # Formatting or schema validation error
+                logger.warning(
+                    "Reasoning parsing / schema validation exception for incident %s: %s",
+                    incident_id,
                     str(e),
                 )
-                fallback_diagnostics_total.inc()
-                fallback = Hypothesis(
-                    rank=1,
-                    hypothesis="Safety Fallback Diagnostic: Groq AI Reasoning service is currently unreachable or timed out.",
-                    confidence_score=0.1,
-                    evidence=["API client connection exception"],
-                    recommended_action="Inspect Groq API status or check logs manually.",
-                )
-                return {"validation_error_message": None, "hypotheses": [fallback]}
-
-            # Formatting or schema validation error
-            logger.warning(
-                "Reasoning parsing / schema validation exception for incident %s: %s",
-                incident_id,
-                str(e),
-            )
-            return {"validation_error_message": f"ValidationError: {str(e)}"}
+                span.set_attribute("llm.validation_error", str(e))
+                return {"validation_error_message": f"ValidationError: {str(e)}"}
 
     @staticmethod
     async def rank_hypotheses(state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Acts as the parsing router. Validates JSON schemas and checks retry count limits.
         """
-        logger.info(
-            "Node [RankHypotheses] executing for incident: %s", state.get("incident_id")
-        )
+        with tracer.start_as_current_span("langgraph.node.rank_hypotheses") as span:
+            incident_id = state.get("incident_id")
+            span.set_attribute("incident.id", incident_id or "")
+            logger.info(
+                "Node [RankHypotheses] executing for incident: %s", incident_id
+            )
 
-        # If there's a validation error, we routing based on retry counts
-        val_error = state.get("validation_error_message")
-        if val_error:
-            # Increment retry count
-            current_retry = state.get("retry_count", 0) + 1
-            if current_retry < 3:
-                logger.warning(
-                    "Hypothesis validation failed: %s. Triggering correction loop.",
-                    val_error,
-                )
-                return {
-                    "retry_count": current_retry,
-                    "validation_error_message": val_error,
-                }
-            else:
-                # Fallback path triggered (max retries reached)
-                logger.error(
-                    "Max LLM reasoning retries reached. Triggering fallback hypothesis."
-                )
-                fallback_diagnostics_total.inc()
-                fallback = Hypothesis(
-                    rank=1,
-                    hypothesis="Safety Fallback Diagnostic: Unspecified cascading latency spikes. Target metrics are unreachable or reasoning engine failed to format structure.",
-                    confidence_score=0.1,
-                    evidence=["Ingested firing alert inputs"],
-                    recommended_action="Deploy SRE operators to trace metrics manually.",
-                )
-                return {
-                    "retry_count": current_retry,
-                    "validation_error_message": None,
-                    "hypotheses": [fallback],
-                }
+            # If there's a validation error, we routing based on retry counts
+            val_error = state.get("validation_error_message")
+            if val_error:
+                # Increment retry count
+                current_retry = state.get("retry_count", 0) + 1
+                span.set_attribute("retry_count", current_retry)
+                span.set_attribute("validation_error", val_error)
+                if current_retry < 3:
+                    logger.warning(
+                        "Hypothesis validation failed: %s. Triggering correction loop.",
+                        val_error,
+                    )
+                    return {
+                        "retry_count": current_retry,
+                        "validation_error_message": val_error,
+                    }
+                else:
+                    # Fallback path triggered (max retries reached)
+                    logger.error(
+                        "Max LLM reasoning retries reached. Triggering fallback hypothesis."
+                    )
+                    span.set_attribute("fallback_triggered", True)
+                    fallback_diagnostics_total.inc()
+                    fallback = Hypothesis(
+                        rank=1,
+                        hypothesis="Safety Fallback Diagnostic: Unspecified cascading latency spikes. Target metrics are unreachable or reasoning engine failed to format structure.",
+                        confidence_score=0.1,
+                        evidence=["Ingested firing alert inputs"],
+                        recommended_action="Deploy SRE operators to trace metrics manually.",
+                    )
+                    return {
+                        "retry_count": current_retry,
+                        "validation_error_message": None,
+                        "hypotheses": [fallback],
+                    }
 
-        # If hypotheses are valid, we continue
-        return {"validation_error_message": None}
+            # If hypotheses are valid, we continue
+            return {"validation_error_message": None}
 
     @staticmethod
     async def slack_escalation(state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Formatively maps findings and triggers Slack Bolt deliveries.
         """
-        incident_id = cast(str, state.get("incident_id"))
-        logger.info("Node [SlackEscalation] executing for incident: %s", incident_id)
+        with tracer.start_as_current_span("langgraph.node.slack_escalation") as span:
+            incident_id = cast(str, state.get("incident_id"))
+            span.set_attribute("incident.id", incident_id)
+            logger.info("Node [SlackEscalation] executing (skipping automatic post for operator review) for incident: %s", incident_id)
 
-        # Save hypotheses in Redis before posting to Slack, so the Slack client can access them
-        incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
-        if incident:
-            incident.hypotheses = state.get("hypotheses", [])
-            incident.updated_at = datetime.now(timezone.utc)
-            await asyncio.to_thread(redis_manager.save_incident, incident)
+            # Save hypotheses in Redis before posting to Slack, so the Slack client can access them
+            try:
+                incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
+                if incident:
+                    incident.hypotheses = state.get("hypotheses", [])
+                    incident.updated_at = datetime.now(timezone.utc)
+                    await asyncio.to_thread(redis_manager.save_incident, incident)
 
-        # Import dynamically to avoid circular references if any
-        from src.services.slack_client import slack_client
+                logger.info("Bypassing automatic Slack escalation post for incident %s. Pending operator approval.", incident_id)
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise e
 
-        await slack_client.post_escalation_card(incident_id)
-
-        return {}
+            return {}
 
     @staticmethod
     async def timeline_rca_info(state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Finalizes timeline steps, builds final RCA document draft, and updates Redis database.
         """
-        incident_id = cast(str, state.get("incident_id"))
-        logger.info("Node [TimelineRCAInfo] starting for incident: %s", incident_id)
+        with tracer.start_as_current_span("langgraph.node.timeline_rca_info") as span:
+            incident_id = cast(str, state.get("incident_id"))
+            span.set_attribute("incident.id", incident_id)
+            logger.info("Node [TimelineRCAInfo] starting for incident: %s", incident_id)
 
-        incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
-        if not incident:
-            return {}
+            try:
+                incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
+                if not incident:
+                    span.set_status(trace.StatusCode.ERROR, f"Incident {incident_id} not found in Redis")
+                    return {}
 
-        # Update incident timeline with reasoning steps
-        incident.timeline.append(
-            TimelineItem(
-                timestamp=datetime.now(timezone.utc),
-                event_type="agent_milestone",
-                source="system",
-                message="Incident escalation card dispatched to Slack operators channel.",
-                severity="info",
-            )
-        )
+                # Update incident timeline with reasoning steps
+                incident.timeline.append(
+                    TimelineItem(
+                        timestamp=datetime.now(timezone.utc),
+                        event_type="agent_milestone",
+                        source="system",
+                        message="AI RCA hypotheses generated.",
+                        severity="info",
+                    )
+                )
+                incident.timeline.append(
+                    TimelineItem(
+                        timestamp=datetime.now(timezone.utc),
+                        event_type="agent_milestone",
+                        source="system",
+                        message="Incident pending escalation approval.",
+                        severity="info",
+                    )
+                )
 
-        # Compile hypotheses
-        incident.hypotheses = state.get("hypotheses", [])
-        incident.state = "escalated"
-        incident.updated_at = datetime.now(timezone.utc)
+                # Compile hypotheses
+                incident.hypotheses = state.get("hypotheses", [])
+                incident.state = "pending_approval"
+                incident.updated_at = datetime.now(timezone.utc)
 
-        # Save finalized state back to Redis
-        await asyncio.to_thread(redis_manager.save_incident, incident)
-        logger.info(
-            "Incident %s successfully finalized in database (state=escalated).",
-            incident_id,
-        )
+                # Save finalized state back to Redis
+                await asyncio.to_thread(redis_manager.save_incident, incident)
+                logger.info(
+                    "Incident %s successfully transitioned to pending_approval.",
+                    incident_id,
+                )
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise e
 
-        return {"state": "completed", "timeline": incident.timeline}
+            return {"state": "completed", "timeline": incident.timeline}

@@ -14,6 +14,8 @@ from neo4j.time import DateTime
 from src.config import settings
 from src.database.redis_client import redis_manager
 from src.observability.tracer import tracer
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,59 @@ def _convert_neo4j_datetime(val: Any) -> Any:
     return val
 
 
+class TracedSession:
+    def __init__(self, session: Any) -> None:
+        self._session = session
+
+    def __enter__(self) -> "TracedSession":
+        self._session.__enter__()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Any:
+        return self._session.__exit__(exc_type, exc_val, exc_tb)
+
+    def run(self, query: str, *args: Any, **kwargs: Any) -> Any:
+        operation = "QUERY"
+        stripped = query.strip()
+        if stripped:
+            operation = stripped.split()[0].upper()
+
+        with tracer.start_as_current_span(
+            f"neo4j.query.{operation}",
+            kind=SpanKind.CLIENT
+        ) as span:
+            span.set_attribute("db.system", "neo4j")
+            span.set_attribute("db.statement", query)
+            span.set_attribute("db.operation", operation)
+            try:
+                result = self._session.run(query, *args, **kwargs)
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise e
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._session, name)
+
+
+class TracedDriver:
+    def __init__(self, driver: Any) -> None:
+        self._driver = driver
+
+    def session(self, *args: Any, **kwargs: Any) -> TracedSession:
+        return TracedSession(self._driver.session(*args, **kwargs))
+
+    def close(self) -> None:
+        self._driver.close()
+
+    def verify_connectivity(self) -> None:
+        self._driver.verify_connectivity()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._driver, name)
+
+
 class Neo4jClientManager:
     """
     Manages the lifecycle, health, indexes, and write/read operations of the Neo4j driver connection.
@@ -43,23 +98,24 @@ class Neo4jClientManager:
         self.uri: str = settings.NEO4J_URI
         self.user: str = settings.NEO4J_USER
         self.password: str = settings.NEO4J_PASSWORD
-        self._driver: Optional[Driver] = None
+        self._driver: Optional[Any] = None
 
-    def get_driver(self) -> Driver:
+    def get_driver(self) -> Any:
         """
-        Initializes and returns the Neo4j Driver instance.
+        Initializes and returns the Neo4j Driver instance (wrapped for tracing).
         """
         if self._driver is None:
             logger.info(
                 "Initializing Neo4j Bolt driver to %s as user '%s'", self.uri, self.user
             )
-            self._driver = GraphDatabase.driver(
+            raw_driver = GraphDatabase.driver(
                 self.uri,
                 auth=(self.user, self.password),
                 max_connection_lifetime=30 * 60,
                 max_connection_pool_size=50,
                 connection_timeout=5.0,
             )
+            self._driver = TracedDriver(raw_driver)
         return self._driver
 
     def close(self) -> None:

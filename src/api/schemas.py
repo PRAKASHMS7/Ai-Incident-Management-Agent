@@ -96,7 +96,7 @@ class IncidentStateModel(BaseModel):
 
     id: str
     state: str = (
-        "open"  # open, analyzing, awaiting_approval, escalated, resolved, merged
+        "open"  # open, analyzing, pending_approval, approval_rejected, escalated, resolved, merged
     )
     severity: str = "warning"
     services_affected: List[str] = Field(default_factory=list)
@@ -108,6 +108,17 @@ class IncidentStateModel(BaseModel):
     updated_at: datetime
     merged_into: Optional[str] = None
     rca_document_url: Optional[str] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    rejected_by: Optional[str] = None
+    rejected_at: Optional[datetime] = None
+
+
+class EscalationApprovePayload(BaseModel):
+    """Payload to approve and dispatch an incident escalation to Slack."""
+
+    channel: str
+    notes: Optional[str] = None
 
 
 class ServiceNodeModel(BaseModel):

@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { SeverityBadge } from '../../components/dashboard/SeverityBadge';
 import { IncidentCard } from '../../components/dashboard/IncidentCard';
 import { IncidentTable } from '../../components/dashboard/IncidentTable';
-import { IncidentStateModel } from '../../api/types';
+import { IncidentStateModel, TimelineItem } from '../../api/types';
 import { TimelineViewer } from '../../components/incident/TimelineViewer';
 
 // Mock react-router-dom useNavigate
@@ -111,7 +111,7 @@ describe('IncidentTable Component', () => {
 
 describe('TimelineViewer Component', () => {
   test('renders timeline event timestamps in correct IST format', () => {
-    const mockTimeline = [
+    const mockTimeline: TimelineItem[] = [
       {
         timestamp: '2026-05-30T16:07:12Z',
         event_type: 'alert_triggered',
