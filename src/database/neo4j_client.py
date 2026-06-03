@@ -54,8 +54,7 @@ class TracedSession:
             operation = stripped.split()[0].upper()
 
         with tracer.start_as_current_span(
-            f"neo4j.query.{operation}",
-            kind=SpanKind.CLIENT
+            f"neo4j.query.{operation}", kind=SpanKind.CLIENT
         ) as span:
             span.set_attribute("db.system", "neo4j")
             span.set_attribute("db.statement", query)

@@ -47,11 +47,11 @@ class RCAGenerator:
 
             sev_rank = SEVERITY_ORDER.get(sev, 4)
             src_rank = SOURCE_ORDER.get(src, 4)
-            
+
             ts = item.timestamp
             if ts.tzinfo is not None:
                 ts = ts.replace(tzinfo=None)
-                
+
             return (ts, sev_rank, src_rank)
 
         return sorted(timeline, key=sort_key)
@@ -127,9 +127,11 @@ class RCAGenerator:
         resolved_at = "unknown time"
 
         if timeline:
+
             def get_naive_ts(x):
                 ts = x.timestamp
                 return ts.replace(tzinfo=None) if ts.tzinfo is not None else ts
+
             sorted_t = sorted(timeline, key=get_naive_ts)
             dt_start = sorted_t[0].timestamp
             if isinstance(dt_start, str):
@@ -139,7 +141,9 @@ class RCAGenerator:
                     dt_start = datetime.now(timezone.utc)
             if dt_start.tzinfo is None:
                 dt_start = dt_start.replace(tzinfo=timezone.utc)
-            detected_at = dt_start.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+            detected_at = dt_start.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+                "%d %b %Y, %I:%M:%S %p IST"
+            )
 
             dt_end = sorted_t[-1].timestamp
             if isinstance(dt_end, str):
@@ -149,7 +153,9 @@ class RCAGenerator:
                     dt_end = datetime.now(timezone.utc)
             if dt_end.tzinfo is None:
                 dt_end = dt_end.replace(tzinfo=timezone.utc)
-            resolved_at = dt_end.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+            resolved_at = dt_end.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+                "%d %b %Y, %I:%M:%S %p IST"
+            )
 
         summary = f"Incident {incident_id} affected the service(s): {services_str}. "
 
@@ -190,7 +196,9 @@ class RCAGenerator:
                         dt_t = datetime.now(timezone.utc)
                 if dt_t.tzinfo is None:
                     dt_t = dt_t.replace(tzinfo=timezone.utc)
-                ts_str = dt_t.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+                ts_str = dt_t.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+                    "%d %b %Y, %I:%M:%S %p IST"
+                )
                 msg_text = t.message.replace("|", "\\|")
                 timeline_rows += (
                     f"| {ts_str} | {t.source} | {t.severity.upper()} | {msg_text} |\n"
@@ -219,7 +227,9 @@ class RCAGenerator:
         if dt_created:
             if dt_created.tzinfo is None:
                 dt_created = dt_created.replace(tzinfo=timezone.utc)
-            detected_at = dt_created.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+            detected_at = dt_created.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+                "%d %b %Y, %I:%M:%S %p IST"
+            )
         else:
             detected_at = "N/A"
 
@@ -232,7 +242,9 @@ class RCAGenerator:
         if dt_updated:
             if dt_updated.tzinfo is None:
                 dt_updated = dt_updated.replace(tzinfo=timezone.utc)
-            resolved_at = dt_updated.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M:%S %p IST")
+            resolved_at = dt_updated.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+                "%d %b %Y, %I:%M:%S %p IST"
+            )
         else:
             resolved_at = "N/A"
 

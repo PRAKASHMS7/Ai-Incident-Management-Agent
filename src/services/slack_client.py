@@ -198,10 +198,10 @@ class SlackClient:
 
     # 4. Escalation Dispatcher
     async def post_escalation_card(
-        self, 
-        incident_id: str, 
-        channel: Optional[str] = None, 
-        operator_notes: Optional[str] = None
+        self,
+        incident_id: str,
+        channel: Optional[str] = None,
+        operator_notes: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Main SRE entry point for graph nodes to post Block Kit alerts.
@@ -252,16 +252,23 @@ class SlackClient:
             ]
 
             if operator_notes:
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*Additional Escalation Context:*\n{operator_notes}"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Additional Escalation Context:*\n{operator_notes}",
+                        },
                     }
-                })
+                )
 
             # Include actions buttons only if not resolved yet
-            if incident.state in ["open", "analyzing", "awaiting_approval", "pending_approval"]:
+            if incident.state in [
+                "open",
+                "analyzing",
+                "awaiting_approval",
+                "pending_approval",
+            ]:
                 blocks.append(self.actions_block(incident.id))
 
             try:
@@ -391,7 +398,9 @@ async def handle_ack_incident(ack, body, client, respond):
                     text="Incident Escalation Card Acknowledged",
                 )
             except Exception as ex:
-                logger.error("Failed to update Slack message card via chat_update: %s", str(ex))
+                logger.error(
+                    "Failed to update Slack message card via chat_update: %s", str(ex)
+                )
 
 
 @slack_app.action("slack_resolve_incident")
@@ -473,5 +482,6 @@ async def handle_resolve_incident(ack, body, client, respond):
                     text="Incident Escalation Card Resolved",
                 )
             except Exception as ex:
-                logger.error("Failed to update Slack message card via chat_update: %s", str(ex))
-
+                logger.error(
+                    "Failed to update Slack message card via chat_update: %s", str(ex)
+                )

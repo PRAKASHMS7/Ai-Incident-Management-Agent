@@ -38,7 +38,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def run_incident_workflow(incident_id: str, parent_context: Optional[context.Context] = None):
+async def run_incident_workflow(
+    incident_id: str, parent_context: Optional[context.Context] = None
+):
     """
     Asynchronously invokes the LangGraph reasoning workflow for the newly created incident.
     """
@@ -47,12 +49,17 @@ async def run_incident_workflow(incident_id: str, parent_context: Optional[conte
         token = context.attach(parent_context)
     try:
         from src.graph.workflow import compiled_workflow
+
         config: Any = {"configurable": {"thread_id": incident_id}}
-        logger.info("Executing LangGraph reasoning workflow for incident %s", incident_id)
+        logger.info(
+            "Executing LangGraph reasoning workflow for incident %s", incident_id
+        )
         with tracer.start_as_current_span("langgraph.workflow") as span:
             span.set_attribute("incident.id", incident_id)
             await compiled_workflow.ainvoke({"incident_id": incident_id}, config=config)
-            logger.info("LangGraph reasoning workflow completed for incident %s", incident_id)
+            logger.info(
+                "LangGraph reasoning workflow completed for incident %s", incident_id
+            )
     except Exception as e:
         logger.error(
             "Failed to run LangGraph reasoning workflow for incident %s: %s",
@@ -139,8 +146,11 @@ def ingest_alerts(
 
             if action == "created":
                 import sys
+
                 if "pytest" not in sys.modules:
-                    background_tasks.add_task(run_incident_workflow, incident_id, curr_context)
+                    background_tasks.add_task(
+                        run_incident_workflow, incident_id, curr_context
+                    )
         except Exception as e:
             logger.error(
                 "Failed to correlate alert %s: %s", alert_id, str(e), exc_info=True
@@ -326,27 +336,35 @@ def get_dashboard_metrics() -> Dict[str, Any]:
             if data:
                 try:
                     state = json.loads(data)
-                    
+
                     # 1. Count LLM analysis executions (RCA hypotheses generated)
                     hypotheses = state.get("hypotheses", [])
                     has_hypotheses = len(hypotheses) > 0
                     timeline = state.get("timeline", [])
                     for event in timeline:
-                        if event.get("event_type") == "agent_milestone" and event.get("message") == "AI RCA hypotheses generated.":
+                        if (
+                            event.get("event_type") == "agent_milestone"
+                            and event.get("message") == "AI RCA hypotheses generated."
+                        ):
                             has_hypotheses = True
                             break
                     if has_hypotheses:
                         llm_call_volume += 1
-                        
+
                     # 2. Count approved and rejected escalations
                     incident_state = state.get("state")
                     approved_by = state.get("approved_by")
                     rejected_by = state.get("rejected_by")
-                    if approved_by is not None or incident_state in ("escalated", "resolved"):
+                    if approved_by is not None or incident_state in (
+                        "escalated",
+                        "resolved",
+                    ):
                         approved_escalations += 1
-                    elif rejected_by is not None or incident_state == "approval_rejected":
+                    elif (
+                        rejected_by is not None or incident_state == "approval_rejected"
+                    ):
                         rejected_escalations += 1
-                    
+
                     # 3. Count incidents detected in the last 60 minutes
                     ingested_at_str = None
                     for event in timeline:
@@ -357,19 +375,24 @@ def get_dashboard_metrics() -> Dict[str, Any]:
                         ingested_at_str = state.get("created_at")
 
                     if ingested_at_str:
-                        if ingested_at_str.endswith('Z'):
-                            ingested_at_str = ingested_at_str[:-1] + '+00:00'
+                        if ingested_at_str.endswith("Z"):
+                            ingested_at_str = ingested_at_str[:-1] + "+00:00"
                         ingested_at = datetime.fromisoformat(ingested_at_str)
                         if ingested_at.tzinfo is None:
                             ingested_at = ingested_at.replace(tzinfo=timezone.utc)
-                        
+
                         delta = now - ingested_at
                         if delta.total_seconds() <= 3600:
                             incidents_detected_per_hour += 1
                 except Exception as e:
-                    logger.warning("Failed to parse incident data for dashboard metrics: %s", str(e))
+                    logger.warning(
+                        "Failed to parse incident data for dashboard metrics: %s",
+                        str(e),
+                    )
     except Exception as e:
-        logger.error("Failed to query incident keys from Redis for dashboard metrics: %s", str(e))
+        logger.error(
+            "Failed to query incident keys from Redis for dashboard metrics: %s", str(e)
+        )
 
     # Calculate metrics with formulas:
     total_decisions = approved_escalations + rejected_escalations
@@ -390,10 +413,11 @@ def get_dashboard_metrics() -> Dict[str, Any]:
     return {
         "incidents_detected_per_hour": incidents_detected_per_hour,
         "detection_accuracy": detection_accuracy,
-        "false_positive_rate": false_positive_rate / 100.0,  # Returned as fraction for the UI percentage multiplier
+        "false_positive_rate": false_positive_rate
+        / 100.0,  # Returned as fraction for the UI percentage multiplier
         "false_positive_estimated": false_positive_estimated,
         "llm_call_volume": llm_call_volume,
-        "llm_cost": llm_cost
+        "llm_cost": llm_cost,
     }
 
 
@@ -655,10 +679,13 @@ def get_incident_channels(id: str) -> List[str]:
             if unique_channels:
                 return unique_channels
     except Exception as e:
-        logger.warning("Failed to fetch Slack channels from Redis routing table: %s", str(e))
+        logger.warning(
+            "Failed to fetch Slack channels from Redis routing table: %s", str(e)
+        )
 
     # Fallback to settings.SLACK_CHANNEL
     from src.config import settings
+
     return [settings.SLACK_CHANNEL]
 
 

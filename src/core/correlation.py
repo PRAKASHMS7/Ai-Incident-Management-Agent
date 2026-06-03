@@ -56,7 +56,7 @@ class CorrelationEngine:
                 alert_ts = alert.starts_at
                 if alert_ts.tzinfo is not None:
                     alert_ts = alert_ts.replace(tzinfo=None)
-                
+
                 incident_ts = incident.updated_at
                 if incident_ts.tzinfo is not None:
                     incident_ts = incident_ts.replace(tzinfo=None)
@@ -199,13 +199,19 @@ class CorrelationEngine:
         incident.timeline.append(timeline_item)
 
         # Sort timeline chronologically
-        incident.timeline.sort(key=lambda x: x.timestamp.replace(tzinfo=None) if x.timestamp.tzinfo is not None else x.timestamp)
+        incident.timeline.sort(
+            key=lambda x: (
+                x.timestamp.replace(tzinfo=None)
+                if x.timestamp.tzinfo is not None
+                else x.timestamp
+            )
+        )
 
         # Update updated_at
         alert_ts = alert.starts_at
         if alert_ts.tzinfo is not None:
             alert_ts = alert_ts.replace(tzinfo=None)
-            
+
         incident_ts = incident.updated_at
         if incident_ts.tzinfo is not None:
             incident_ts = incident_ts.replace(tzinfo=None)
@@ -269,7 +275,13 @@ class CorrelationEngine:
             redis_manager.save_incident(secondary)  # Removing from active sets
 
         # Sort primary timeline chronologically
-        primary.timeline.sort(key=lambda x: x.timestamp.replace(tzinfo=None) if x.timestamp.tzinfo is not None else x.timestamp)
+        primary.timeline.sort(
+            key=lambda x: (
+                x.timestamp.replace(tzinfo=None)
+                if x.timestamp.tzinfo is not None
+                else x.timestamp
+            )
+        )
 
         # Update primary severity based on all alerts
         severity_ranking = {"info": 1, "warning": 2, "critical": 3}

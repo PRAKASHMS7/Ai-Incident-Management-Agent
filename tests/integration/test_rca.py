@@ -224,7 +224,9 @@ def test_update_rca_report(mock_redis_db, create_incident, client):
     assert res.status_code == 200
 
     new_content = "# Updated Incident Post-Mortem Report\nModified content by operator."
-    response = client.put("/rca/inc-update-test", json={"markdown_content": new_content})
+    response = client.put(
+        "/rca/inc-update-test", json={"markdown_content": new_content}
+    )
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 
@@ -241,4 +243,3 @@ def test_update_rca_report(mock_redis_db, create_incident, client):
     # Cleanup
     if local_path.exists():
         local_path.unlink()
-

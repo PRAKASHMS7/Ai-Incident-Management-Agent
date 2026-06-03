@@ -136,7 +136,7 @@ class RedisClientManager:
                 results = pipe1.execute()
 
                 curr_match = all(results[0:k])
-                prev_match = all(results[k:2*k])
+                prev_match = all(results[k : 2 * k])
 
                 if curr_match or prev_match:
                     logger.info("Alert deduplicated. Dropping alert: %s", raw_string)

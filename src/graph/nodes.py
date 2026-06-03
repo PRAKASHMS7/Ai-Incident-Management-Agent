@@ -79,8 +79,12 @@ class WorkflowNodes:
 
             incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
             if not incident:
-                logger.error("Incident %s not found in Redis state. Halting.", incident_id)
-                span.set_status(trace.StatusCode.ERROR, f"Incident {incident_id} not found in Redis")
+                logger.error(
+                    "Incident %s not found in Redis state. Halting.", incident_id
+                )
+                span.set_status(
+                    trace.StatusCode.ERROR, f"Incident {incident_id} not found in Redis"
+                )
                 return {"state": "failed"}
 
             return {
@@ -105,16 +109,16 @@ class WorkflowNodes:
         with tracer.start_as_current_span("langgraph.node.fetch_topology") as span:
             incident_id = state.get("incident_id")
             span.set_attribute("incident.id", incident_id or "")
-            logger.info(
-                "Node [FetchTopology] executing for incident: %s", incident_id
-            )
+            logger.info("Node [FetchTopology] executing for incident: %s", incident_id)
             services = state.get("services_affected", [])
             expanded = set(services)
 
             # Traverse neighbors (depth = 1) for each service using asyncio.to_thread
             for svc in services:
                 try:
-                    upstreams = await asyncio.to_thread(neo4j_manager.get_upstreams, svc)
+                    upstreams = await asyncio.to_thread(
+                        neo4j_manager.get_upstreams, svc
+                    )
                     downstreams_raw = await asyncio.to_thread(
                         neo4j_manager.get_downstreams, svc
                     )
@@ -222,7 +226,10 @@ class WorkflowNodes:
                 logger.info(
                     "Simulating malformed JSON output for TestRetryLoopAlert (attempt 0)"
                 )
-                span.set_attribute("llm.validation_error", "Malformed JSON structure: incomplete closing brackets.")
+                span.set_attribute(
+                    "llm.validation_error",
+                    "Malformed JSON structure: incomplete closing brackets.",
+                )
                 return {
                     "validation_error_message": "Malformed JSON structure: incomplete closing brackets."
                 }
@@ -232,7 +239,10 @@ class WorkflowNodes:
                     "Simulating persistent JSON failure for TestFallbackAlert (attempt %d)",
                     retry_count,
                 )
-                span.set_attribute("llm.validation_error", "Persistent model validation JSON exception.")
+                span.set_attribute(
+                    "llm.validation_error",
+                    "Persistent model validation JSON exception.",
+                )
                 return {
                     "validation_error_message": "Persistent model validation JSON exception."
                 }
@@ -255,7 +265,9 @@ class WorkflowNodes:
             topology_section += f"Analysis Scope Services: {', '.join(state.get('expanded_topology_services', []))}\n"
             for svc in state.get("services_affected", []):
                 try:
-                    upstreams = await asyncio.to_thread(neo4j_manager.get_upstreams, svc)
+                    upstreams = await asyncio.to_thread(
+                        neo4j_manager.get_upstreams, svc
+                    )
                     downstreams_raw = await asyncio.to_thread(
                         neo4j_manager.get_downstreams, svc
                     )
@@ -327,7 +339,9 @@ class WorkflowNodes:
                 }
             except json.JSONDecodeError as e:
                 logger.warning(
-                    "LLM returned malformed JSON on incident %s: %s", incident_id, str(e)
+                    "LLM returned malformed JSON on incident %s: %s",
+                    incident_id,
+                    str(e),
                 )
                 span.record_exception(e)
                 span.set_attribute("llm.validation_error", str(e))
@@ -347,7 +361,9 @@ class WorkflowNodes:
                         "Groq reasoning engine failed completely: %s. Entering safety fallback mode.",
                         str(e),
                     )
-                    span.set_status(trace.StatusCode.ERROR, f"Groq query failed: {str(e)}")
+                    span.set_status(
+                        trace.StatusCode.ERROR, f"Groq query failed: {str(e)}"
+                    )
                     fallback_diagnostics_total.inc()
                     fallback = Hypothesis(
                         rank=1,
@@ -375,9 +391,7 @@ class WorkflowNodes:
         with tracer.start_as_current_span("langgraph.node.rank_hypotheses") as span:
             incident_id = state.get("incident_id")
             span.set_attribute("incident.id", incident_id or "")
-            logger.info(
-                "Node [RankHypotheses] executing for incident: %s", incident_id
-            )
+            logger.info("Node [RankHypotheses] executing for incident: %s", incident_id)
 
             # If there's a validation error, we routing based on retry counts
             val_error = state.get("validation_error_message")
@@ -426,17 +440,25 @@ class WorkflowNodes:
         with tracer.start_as_current_span("langgraph.node.slack_escalation") as span:
             incident_id = cast(str, state.get("incident_id"))
             span.set_attribute("incident.id", incident_id)
-            logger.info("Node [SlackEscalation] executing (skipping automatic post for operator review) for incident: %s", incident_id)
+            logger.info(
+                "Node [SlackEscalation] executing (skipping automatic post for operator review) for incident: %s",
+                incident_id,
+            )
 
             # Save hypotheses in Redis before posting to Slack, so the Slack client can access them
             try:
-                incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
+                incident = await asyncio.to_thread(
+                    redis_manager.get_incident, incident_id
+                )
                 if incident:
                     incident.hypotheses = state.get("hypotheses", [])
                     incident.updated_at = datetime.now(timezone.utc)
                     await asyncio.to_thread(redis_manager.save_incident, incident)
 
-                logger.info("Bypassing automatic Slack escalation post for incident %s. Pending operator approval.", incident_id)
+                logger.info(
+                    "Bypassing automatic Slack escalation post for incident %s. Pending operator approval.",
+                    incident_id,
+                )
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(trace.StatusCode.ERROR, str(e))
@@ -455,9 +477,14 @@ class WorkflowNodes:
             logger.info("Node [TimelineRCAInfo] starting for incident: %s", incident_id)
 
             try:
-                incident = await asyncio.to_thread(redis_manager.get_incident, incident_id)
+                incident = await asyncio.to_thread(
+                    redis_manager.get_incident, incident_id
+                )
                 if not incident:
-                    span.set_status(trace.StatusCode.ERROR, f"Incident {incident_id} not found in Redis")
+                    span.set_status(
+                        trace.StatusCode.ERROR,
+                        f"Incident {incident_id} not found in Redis",
+                    )
                     return {}
 
                 # Update incident timeline with reasoning steps

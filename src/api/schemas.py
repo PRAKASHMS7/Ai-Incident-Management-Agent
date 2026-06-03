@@ -196,4 +196,3 @@ class RcaUpdatePayload(BaseModel):
     """Payload to update an existing RCA post-mortem report."""
 
     markdown_content: str
-

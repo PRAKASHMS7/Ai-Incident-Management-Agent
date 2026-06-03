@@ -213,12 +213,13 @@ async def test_groq_client_retry_logic():
 async def test_groq_client_concurrency_limit():
     """Verifies that the GroqClient limits concurrent HTTP requests to a maximum of 10."""
     import asyncio
+
     client = GroqClient(api_key="real_key")
-    
+
     active_calls = 0
     max_observed_concurrency = 0
     lock = asyncio.Lock()
-    
+
     async def mock_post(*args, **kwargs):
         nonlocal active_calls, max_observed_concurrency
         async with lock:
@@ -229,7 +230,7 @@ async def test_groq_client_concurrency_limit():
         await asyncio.sleep(0.05)
         async with lock:
             active_calls -= 1
-        
+
         # Return mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -275,8 +276,7 @@ async def test_groq_client_concurrency_limit():
         # Fire 15 concurrent requests
         tasks = [client.get_reasoning("sys", f"user-{i}") for i in range(15)]
         await asyncio.gather(*tasks)
-        
+
         # Verify that max concurrency observed was at most 10
         assert max_observed_concurrency <= 10
         assert max_observed_concurrency > 0
-

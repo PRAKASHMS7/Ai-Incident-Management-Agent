@@ -79,6 +79,7 @@ async def test_slack_channel_routing():
         mock_get_redis.return_value = mock_r
 
         from src.config import settings
+
         target = await client.get_routing_channel("unknown-service")
         assert target == settings.SLACK_CHANNEL  # default settings.SLACK_CHANNEL
 

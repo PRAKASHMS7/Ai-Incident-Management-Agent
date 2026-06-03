@@ -88,7 +88,9 @@ class GroqClient:
 
         logger.info("Sending request to Groq API using model: %s", payload.get("model"))
         async with self.semaphore:
-            response = await self.client.post(self.base_url, headers=headers, json=payload)
+            response = await self.client.post(
+                self.base_url, headers=headers, json=payload
+            )
             response.raise_for_status()
             return response.json()
 

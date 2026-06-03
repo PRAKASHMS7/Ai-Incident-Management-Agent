@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 from src.main import app
 from src.api.schemas import IncidentStateModel, StandardizedAlert, TimelineItem
 
+
 @pytest.fixture
 def client():
     """Returns a test client for the FastAPI app."""
     return TestClient(app)
+
 
 @pytest.fixture
 def mock_incident():
@@ -47,6 +49,7 @@ def mock_incident():
         updated_at=datetime(2026, 5, 26, 12, 0, 0),
     )
 
+
 @patch("src.database.redis_client.RedisClientManager.get_client")
 def test_get_channels(mock_redis_get, client):
     """Verifies that available channels can be fetched (dynamic list from Redis routing)."""
@@ -61,6 +64,7 @@ def test_get_channels(mock_redis_get, client):
     assert "#sre-critical-alerts" in channels
     assert "#sre-warnings" in channels
 
+
 @patch("src.database.redis_client.RedisClientManager.get_client")
 def test_get_channels_fallback(mock_redis_get, client):
     """Verifies that channels fetch falls back to settings.SLACK_CHANNEL when Redis routing is empty."""
@@ -74,21 +78,27 @@ def test_get_channels_fallback(mock_redis_get, client):
     assert isinstance(channels, list)
 
     from src.config import settings
+
     assert settings.SLACK_CHANNEL in channels
+
 
 @patch("src.services.slack_client.SlackClient.post_escalation_card")
 @patch("src.database.redis_client.RedisClientManager.save_incident")
 @patch("src.database.redis_client.RedisClientManager.get_incident")
-def test_approve_escalation_success(mock_get, mock_save, mock_post_card, mock_incident, client):
+def test_approve_escalation_success(
+    mock_get, mock_save, mock_post_card, mock_incident, client
+):
     """Verifies successful escalation approval."""
     mock_get.return_value = mock_incident
 
     payload = {
         "channel": "#sre-critical-alerts",
-        "notes": "Escalating payment service latency to critical channel"
+        "notes": "Escalating payment service latency to critical channel",
     }
 
-    response = client.post("/incidents/inc-approval-test/approve?operator_name=Prakash", json=payload)
+    response = client.post(
+        "/incidents/inc-approval-test/approve?operator_name=Prakash", json=payload
+    )
     assert response.status_code == 200
     res_data = response.json()
 
@@ -110,14 +120,17 @@ def test_approve_escalation_success(mock_get, mock_save, mock_post_card, mock_in
     mock_post_card.assert_called_once_with(
         incident_id="inc-approval-test",
         channel="#sre-critical-alerts",
-        operator_notes="Escalating payment service latency to critical channel"
+        operator_notes="Escalating payment service latency to critical channel",
     )
     mock_save.assert_called_once()
+
 
 @patch("src.services.slack_client.SlackClient.post_escalation_card")
 @patch("src.database.redis_client.RedisClientManager.save_incident")
 @patch("src.database.redis_client.RedisClientManager.get_incident")
-def test_reject_escalation_success(mock_get, mock_save, mock_post_card, mock_incident, client):
+def test_reject_escalation_success(
+    mock_get, mock_save, mock_post_card, mock_incident, client
+):
     """Verifies successful escalation rejection."""
     mock_get.return_value = mock_incident
 
@@ -141,17 +154,17 @@ def test_reject_escalation_success(mock_get, mock_save, mock_post_card, mock_inc
     mock_post_card.assert_not_called()
     mock_save.assert_called_once()
 
+
 @patch("src.database.redis_client.RedisClientManager.get_incident")
 def test_approve_conflict_state(mock_get, mock_incident, client):
     """Verifies error response when trying to approve an incident not in pending_approval."""
     mock_incident.state = "open"
     mock_get.return_value = mock_incident
 
-    payload = {
-        "channel": "#sre-critical-alerts",
-        "notes": "Should fail"
-    }
+    payload = {"channel": "#sre-critical-alerts", "notes": "Should fail"}
 
-    response = client.post("/incidents/inc-approval-test/approve?operator_name=Prakash", json=payload)
+    response = client.post(
+        "/incidents/inc-approval-test/approve?operator_name=Prakash", json=payload
+    )
     assert response.status_code == 409
     assert "expected 'pending_approval'" in response.json()["detail"]
