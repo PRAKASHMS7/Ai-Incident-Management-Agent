@@ -7,7 +7,7 @@ Provides driver management, session helpers, health checks, and path traversal q
 import logging
 import json
 from typing import Dict, Any, List, Optional
-from neo4j import GraphDatabase, Driver
+from neo4j import GraphDatabase
 from neo4j.exceptions import Neo4jError
 from neo4j.time import DateTime
 

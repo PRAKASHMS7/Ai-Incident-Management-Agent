@@ -6,7 +6,7 @@ Defines HTTP handlers for alert ingestion, topology nodes management, and depend
 
 import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 import json
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def run_incident_workflow(incident_id: str, parent_context: context.Context = None):
+async def run_incident_workflow(incident_id: str, parent_context: Optional[context.Context] = None):
     """
     Asynchronously invokes the LangGraph reasoning workflow for the newly created incident.
     """
@@ -47,7 +47,7 @@ async def run_incident_workflow(incident_id: str, parent_context: context.Contex
         token = context.attach(parent_context)
     try:
         from src.graph.workflow import compiled_workflow
-        config = {"configurable": {"thread_id": incident_id}}
+        config: Any = {"configurable": {"thread_id": incident_id}}
         logger.info("Executing LangGraph reasoning workflow for incident %s", incident_id)
         with tracer.start_as_current_span("langgraph.workflow") as span:
             span.set_attribute("incident.id", incident_id)

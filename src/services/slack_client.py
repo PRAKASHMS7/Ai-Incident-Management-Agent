@@ -8,7 +8,6 @@ tenacity-protected Web API postings, and incident state synchronization.
 import logging
 import asyncio
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from typing import Dict, Any, List, Optional
 import slack_sdk
 from slack_bolt.async_app import AsyncApp
