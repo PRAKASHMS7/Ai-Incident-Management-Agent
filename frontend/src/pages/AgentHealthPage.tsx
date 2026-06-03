@@ -1,12 +1,24 @@
-import React from 'react';
-import { useIncidentStore, usePolling } from '../api/client';
+import React, { useState, useCallback } from 'react';
+import { api, useIncidentStore, usePolling } from '../api/client';
 import { HealthMetricsPanel } from '../components/health/HealthMetricsPanel';
 import { CheckCircle2, AlertTriangle, Cpu } from 'lucide-react';
+import { DashboardMetrics } from '../api/types';
 
 export const AgentHealthPage: React.FC = () => {
   const { systemHealth, fetchSystemHealth } = useIncidentStore();
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | undefined>(undefined);
+
+  const fetchDashboardMetrics = useCallback(async () => {
+    try {
+      const res = await api.get<DashboardMetrics>('/dashboard/metrics');
+      setDashboardMetrics(res.data);
+    } catch (err) {
+      console.error('Failed to fetch dashboard metrics:', err);
+    }
+  }, []);
 
   usePolling(fetchSystemHealth, 5000, []);
+  usePolling(fetchDashboardMetrics, 5000, []);
 
   const overallHealthy = systemHealth?.status === 'healthy';
   const redisHealth = systemHealth?.components?.redis;
@@ -116,7 +128,7 @@ export const AgentHealthPage: React.FC = () => {
       </div>
 
       {/* Observability Statistics graphs */}
-      <HealthMetricsPanel />
+      <HealthMetricsPanel metrics={dashboardMetrics} />
     </div>
   );
 };

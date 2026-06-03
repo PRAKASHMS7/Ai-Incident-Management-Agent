@@ -13,7 +13,8 @@ export default defineConfig({
       '/timeline': 'http://localhost:8000',
       '/rca': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
-      '/topology': 'http://localhost:8000'
+      '/topology': 'http://localhost:8000',
+      '/dashboard': 'http://localhost:8000'
     }
   },
   test: {

@@ -308,6 +308,46 @@ def get_topology_graph() -> Dict[str, Any]:
         )
 
 
+@router.get("/dashboard/metrics", status_code=status.HTTP_200_OK)
+def get_dashboard_metrics() -> Dict[str, Any]:
+    """
+    Exposes real-time performance and quality metrics for the health dashboard.
+    """
+    incidents_detected_per_hour = 0
+    try:
+        redis_client = redis_manager.get_client()
+        keys = redis_client.keys("incident:state:*")
+        now = datetime.now(timezone.utc)
+        for key in keys:
+            data = redis_client.get(key)
+            if data:
+                try:
+                    state = json.loads(data)
+                    created_at_str = state.get("created_at")
+                    if created_at_str:
+                        if created_at_str.endswith('Z'):
+                            created_at_str = created_at_str[:-1] + '+00:00'
+                        created_at = datetime.fromisoformat(created_at_str)
+                        if created_at.tzinfo is None:
+                            created_at = created_at.replace(tzinfo=timezone.utc)
+                        
+                        delta = now - created_at
+                        if delta.total_seconds() <= 3600:
+                            incidents_detected_per_hour += 1
+                except Exception as e:
+                    logger.warning("Failed to parse incident timestamp for dashboard metrics: %s", str(e))
+    except Exception as e:
+        logger.error("Failed to query incident keys from Redis for dashboard metrics: %s", str(e))
+
+    # TODO: Implement operator feedback workflow to classify false positive incidents.
+    # Currently exposing a placeholder value marked as estimated.
+    return {
+        "incidents_detected_per_hour": incidents_detected_per_hour,
+        "false_positive_rate": 0.05,
+        "false_positive_estimated": True
+    }
+
+
 @router.post("/incidents/{id}/resolve", status_code=status.HTTP_200_OK)
 async def resolve_incident(id: str, operator_name: str = "operator") -> Dict[str, Any]:
     """

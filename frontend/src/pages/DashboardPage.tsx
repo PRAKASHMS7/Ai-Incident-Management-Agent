@@ -76,38 +76,38 @@ export const DashboardPage: React.FC = () => {
       {/* Counters layout (Grident styled) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* KPI 1 */}
-        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex items-center gap-4 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-rose-500/10 transition-all duration-300"></div>
-          <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 text-rose-400 shadow-md">
-            <ShieldAlert className="w-6 h-6" />
+        <div className="kpi-card border border-slate-800 rounded-2xl bg-gradient-to-br from-[#0D1830]/95 via-[#0B1020]/90 to-[#1c0f1b]/80 p-5 flex items-center gap-4.5 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/[0.03] rounded-full blur-xl pointer-events-none group-hover:bg-rose-500/10 transition-all duration-300"></div>
+          <div className="p-3.5 bg-rose-500/10 rounded-xl border border-rose-500/20 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.15)] status-glow-critical badge-interactive shrink-0">
+            <ShieldAlert className="w-6.5 h-6.5" />
           </div>
           <div className="flex flex-col">
-            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest leading-none">Active Critical Issues</p>
-            <p className="text-2xl font-extrabold text-slate-100 mt-1.5 leading-none">{criticalCount}</p>
+            <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider leading-none">Active Critical Issues</p>
+            <p className="text-3xl font-extrabold text-slate-100 mt-2 leading-none tracking-tight">{criticalCount}</p>
           </div>
         </div>
 
         {/* KPI 2 */}
-        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex items-center gap-4 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-300"></div>
-          <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shadow-md">
-            <AlertCircle className="w-6 h-6 animate-pulse" />
+        <div className="kpi-card border border-slate-800 rounded-2xl bg-gradient-to-br from-[#0D1830]/95 via-[#0B1020]/90 to-[#130f2c]/80 p-5 flex items-center gap-4.5 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/[0.03] rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-300"></div>
+          <div className="p-3.5 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.15)] badge-interactive shrink-0">
+            <AlertCircle className="w-6.5 h-6.5 animate-pulse" />
           </div>
           <div className="flex flex-col">
-            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest leading-none">Total Active Incidents</p>
-            <p className="text-2xl font-extrabold text-slate-100 mt-1.5 leading-none">{activeCount}</p>
+            <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider leading-none">Total Active Incidents</p>
+            <p className="text-3xl font-extrabold text-slate-100 mt-2 leading-none tracking-tight">{activeCount}</p>
           </div>
         </div>
 
         {/* KPI 3 */}
-        <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex items-center gap-4 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-300"></div>
-          <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 shadow-md">
-            <CheckCircle className="w-6 h-6" />
+        <div className="kpi-card border border-slate-800 rounded-2xl bg-gradient-to-br from-[#0D1830]/95 via-[#0B1020]/90 to-[#0e2220]/80 p-5 flex items-center gap-4.5 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/[0.03] rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-300"></div>
+          <div className="p-3.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)] status-glow-resolved badge-interactive shrink-0">
+            <CheckCircle className="w-6.5 h-6.5" />
           </div>
           <div className="flex flex-col">
-            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-widest leading-none">Closed Post-Mortems</p>
-            <p className="text-2xl font-extrabold text-slate-100 mt-1.5 leading-none">{incidents.length - activeCount}</p>
+            <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider leading-none">Closed Post-Mortems</p>
+            <p className="text-3xl font-extrabold text-slate-100 mt-2 leading-none tracking-tight">{incidents.length - activeCount}</p>
           </div>
         </div>
       </div>

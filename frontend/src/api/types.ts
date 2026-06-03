@@ -66,3 +66,9 @@ export interface SystemHealth {
     neo4j: ComponentHealth;
   };
 }
+
+export interface DashboardMetrics {
+  incidents_detected_per_hour: number;
+  false_positive_rate: number;
+  false_positive_estimated: boolean;
+}

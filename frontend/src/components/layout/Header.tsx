@@ -30,15 +30,12 @@ export const Header: React.FC = () => {
           <Brain className="w-6 h-6 animate-pulse" />
         </div>
         <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-100 bg-gradient-to-r from-purple-400 via-purple-300 to-sky-400 bg-clip-text text-transparent font-sans leading-none">
+          <div className="flex items-center">
+            <h1 className="text-[19px] font-black tracking-tight text-slate-100 bg-gradient-to-r from-purple-400 via-purple-300 to-sky-400 bg-clip-text text-transparent font-sans leading-none">
               AI Incident Management
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] font-extrabold uppercase tracking-widest">
-              SaaS Enterprise
-            </span>
           </div>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1.5">
             AI-Powered SRE Command Center
           </span>
         </div>
