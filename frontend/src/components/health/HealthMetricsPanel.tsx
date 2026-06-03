@@ -30,8 +30,12 @@ export const HealthMetricsPanel: React.FC<HealthMetricsPanelProps> = ({ metrics 
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Analysis Accuracy</p>
-            <p className="text-xl font-bold text-slate-100 mt-0.5">97.8%</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Detection Accuracy</p>
+            <p className="text-xl font-bold text-slate-100 mt-0.5">
+              {metrics?.detection_accuracy !== undefined
+                ? `${metrics.detection_accuracy.toFixed(1)}%`
+                : '97.8%'}
+            </p>
           </div>
         </div>
 
@@ -52,8 +56,12 @@ export const HealthMetricsPanel: React.FC<HealthMetricsPanelProps> = ({ metrics 
             <Cpu className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">LLM Concurrency</p>
-            <p className="text-xl font-bold text-slate-100 mt-0.5">2 / 10</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">LLM Call Volume</p>
+            <p className="text-xl font-bold text-slate-100 mt-0.5">
+              {metrics?.llm_call_volume !== undefined
+                ? metrics.llm_call_volume
+                : '2'}
+            </p>
           </div>
         </div>
 
@@ -64,7 +72,11 @@ export const HealthMetricsPanel: React.FC<HealthMetricsPanelProps> = ({ metrics 
           </div>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Daily LLM API Cost</p>
-            <p className="text-xl font-bold text-slate-100 mt-0.5">$0.80</p>
+            <p className="text-xl font-bold text-slate-100 mt-0.5">
+              {metrics?.llm_cost !== undefined
+                ? `$${metrics.llm_cost.toFixed(2)}`
+                : '$0.80'}
+            </p>
           </div>
         </div>
 

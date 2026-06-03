@@ -71,4 +71,7 @@ export interface DashboardMetrics {
   incidents_detected_per_hour: number;
   false_positive_rate: number;
   false_positive_estimated: boolean;
+  detection_accuracy: number;
+  llm_call_volume: number;
+  llm_cost: number;
 }
