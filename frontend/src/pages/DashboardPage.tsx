@@ -3,6 +3,7 @@ import { useIncidentStore, usePolling } from '../api/client';
 import { IncidentCard } from '../components/dashboard/IncidentCard';
 import { IncidentTable } from '../components/dashboard/IncidentTable';
 import { Search, SlidersHorizontal, AlertCircle, CheckCircle, RefreshCw, Layers, ShieldAlert, Sparkles } from 'lucide-react';
+import { PageHeader } from '../components/layout/PageHeader';
 
 export const DashboardPage: React.FC = () => {
   const { incidents, fetchIncidents, resolveIncident, fetchSystemHealth, error } = useIncidentStore();
@@ -51,15 +52,17 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 w-full text-slate-100 select-none animate-fadeIn">
       {/* Top Welcome/Dashboard stats */}
-      <div className="bg-[#0D1830]/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg">
-        <div className="flex flex-col gap-1 z-10">
-          <h2 className="text-lg font-extrabold font-sans tracking-tight">Triage Workbench</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Real-time alert aggregation, automated correlation, and root cause diagnostic states.</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex-1">
+          <PageHeader 
+            title="Triage Workbench" 
+            subtitle="Real-time alert aggregation, automated correlation, and root cause diagnostic states." 
+          />
         </div>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="px-4 py-2 bg-slate-800 border border-slate-700 hover:border-primary/50 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 z-10 shadow-md"
+          className="px-4 py-2 bg-slate-800 border border-slate-700 hover:border-primary/50 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 shrink-0 shadow-md mb-6"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
           Force Sync

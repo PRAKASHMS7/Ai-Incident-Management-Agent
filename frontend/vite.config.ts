@@ -8,13 +8,34 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/alerts': 'http://localhost:8000',
-      '/incidents': 'http://localhost:8000',
-      '/timeline': 'http://localhost:8000',
-      '/rca': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-      '/topology': 'http://localhost:8000',
-      '/dashboard': 'http://localhost:8000'
+      '/alerts': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      },
+      '/incidents': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      },
+      '/timeline': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      },
+      '/rca': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      },
+      '/health': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      },
+      '/topology': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      },
+      '/dashboard': {
+        target: 'http://localhost:8000',
+        bypass: (req) => req.headers.accept?.includes('text/html') ? '/index.html' : undefined
+      }
     }
   },
   test: {

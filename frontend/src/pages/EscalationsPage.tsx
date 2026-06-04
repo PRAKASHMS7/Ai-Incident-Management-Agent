@@ -1,8 +1,9 @@
 import React from 'react';
 import { useIncidentStore, usePolling } from '../api/client';
-import { Send, Clock, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SeverityBadge } from '../components/dashboard/SeverityBadge';
+import { PageHeader } from '../components/layout/PageHeader';
 
 export const EscalationsPage: React.FC = () => {
   const { incidents, fetchIncidents } = useIncidentStore();
@@ -30,22 +31,10 @@ export const EscalationsPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-5 w-full text-slate-100 select-none">
       {/* Header with animation */}
-      <div className="bg-gradient-to-br from-[#121b35]/65 via-[#0B1020]/80 to-[#050816]/90 backdrop-blur-md border border-slate-800/80 rounded-2xl py-4.5 px-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/[0.01] before:to-transparent before:pointer-events-none animate-float-entrance delay-0">
-        <div className="absolute -top-24 -left-20 w-80 h-80 bg-purple-500/[0.03] rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-20 w-80 h-80 bg-blue-500/[0.03] rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="flex flex-col gap-1.5 z-10">
-          <h2 className="text-2.5xl md:text-3.5xl lg:text-[36px] font-black font-sans tracking-tight bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(168,85,247,0.2)] animate-title-glow leading-none pb-1">
-            AI Escalation Center
-          </h2>
-          <p className="text-[13.5px] text-slate-400 mt-1 leading-relaxed max-w-3xl font-medium">
-            Control dispatcher mapping manual/AI approval escalations, Slack card routes, and action items.
-          </p>
-        </div>
-        <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shadow-md shrink-0 badge-interactive animate-pulse z-10">
-          <Send className="w-5.5 h-5.5" />
-        </div>
-      </div>
+      <PageHeader 
+        title="Escalations" 
+        subtitle="Control dispatcher mapping manual/AI approval escalations, Slack card routes, and action items." 
+      />
 
       {/* Escalation Center Grid columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-float-entrance delay-60">

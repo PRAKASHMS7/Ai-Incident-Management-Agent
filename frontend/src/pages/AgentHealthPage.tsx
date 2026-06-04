@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { api, useIncidentStore, usePolling } from '../api/client';
 import { HealthMetricsPanel } from '../components/health/HealthMetricsPanel';
-import { CheckCircle2, AlertTriangle, Cpu } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { DashboardMetrics } from '../api/types';
+import { PageHeader } from '../components/layout/PageHeader';
 
 export const AgentHealthPage: React.FC = () => {
   const { systemHealth, fetchSystemHealth } = useIncidentStore();
@@ -27,15 +28,10 @@ export const AgentHealthPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 w-full text-slate-100 select-none animate-fadeIn">
       {/* Header */}
-      <div className="bg-[#0D1830]/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg">
-        <div className="flex flex-col gap-1 z-10">
-          <h2 className="text-lg font-extrabold font-sans tracking-tight">Agent Performance & System Health</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Monitor AI diagnostics health, API latencies, costs, and state engines connectivity.</p>
-        </div>
-        <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shadow-md shrink-0">
-          <Cpu className="w-5 h-5" />
-        </div>
-      </div>
+      <PageHeader 
+        title="Health Dashboard" 
+        subtitle="Monitor AI diagnostics health, API latencies, costs, and state engines connectivity." 
+      />
 
       {/* Main Health Status Panel */}
       <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg relative overflow-hidden group">
@@ -87,14 +83,6 @@ export const AgentHealthPage: React.FC = () => {
               <span>Ping Status:</span>
               <span className="text-slate-200 font-semibold">{redisHealth?.status || 'unknown'}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Latency (Ping):</span>
-              <span className="text-slate-250 font-bold">{redisHealth?.latency_ms ? `${redisHealth.latency_ms.toFixed(2)} ms` : 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Keys Tracked:</span>
-              <span className="text-slate-200 font-semibold">{redisHealth?.keys_count || 0}</span>
-            </div>
           </div>
         </div>
 
@@ -115,20 +103,124 @@ export const AgentHealthPage: React.FC = () => {
               <span>Ping Status:</span>
               <span className="text-slate-200 font-semibold">{neo4jHealth?.status || 'unknown'}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Latency (Ping):</span>
-              <span className="text-slate-250 font-bold">{neo4jHealth?.latency_ms ? `${neo4jHealth.latency_ms.toFixed(2)} ms` : 'N/A'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Nodes / Edges Count:</span>
-              <span className="text-slate-200 font-semibold">Seeded</span>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Observability Statistics graphs */}
       <HealthMetricsPanel metrics={dashboardMetrics} />
+
+      {/* System Components Health */}
+      <div className="border border-slate-800 rounded-2xl bg-[#0D1830]/80 p-5 flex flex-col gap-4 shadow-lg animate-fadeIn">
+        <div className="border-b border-slate-800/80 pb-3">
+          <span className="text-xs font-bold text-slate-200 uppercase tracking-widest">System Components Health</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          
+          {/* Component 1: Alert Ingestion */}
+          <div className="glass-panel p-4 rounded-xl border border-border bg-[#070D19]/45 hover:border-slate-700/60 transition-all duration-300 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-bold text-slate-200">Alert Ingestion</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Engine</span>
+              <span className="text-[9px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Operational
+              </span>
+            </div>
+          </div>
+
+          {/* Component 2: RCA Engine */}
+          <div className="glass-panel p-4 rounded-xl border border-border bg-[#070D19]/45 hover:border-slate-700/60 transition-all duration-300 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-bold text-slate-200">RCA Engine</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Engine</span>
+              <span className="text-[9px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Operational
+              </span>
+            </div>
+          </div>
+
+          {/* Component 3: Escalation Engine */}
+          <div className="glass-panel p-4 rounded-xl border border-border bg-[#070D19]/45 hover:border-slate-700/60 transition-all duration-300 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-bold text-slate-200">Escalation Engine</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Engine</span>
+              <span className="text-[9px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Operational
+              </span>
+            </div>
+          </div>
+
+          {/* Component 4: Incident Correlation */}
+          <div className="glass-panel p-4 rounded-xl border border-border bg-[#070D19]/45 hover:border-slate-700/60 transition-all duration-300 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-bold text-slate-200">Incident Correlation</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Engine</span>
+              <span className="text-[9px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Operational
+              </span>
+            </div>
+          </div>
+
+          {/* Component 5: Dependency Analysis */}
+          <div className="glass-panel p-4 rounded-xl border border-border bg-[#070D19]/45 hover:border-slate-700/60 transition-all duration-300 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-bold text-slate-200">Dependency Analysis</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Engine</span>
+              <span className="text-[9px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Operational
+              </span>
+            </div>
+          </div>
+
+          {/* Component 6: Post-Incident Reporting */}
+          <div className="glass-panel p-4 rounded-xl border border-border bg-[#070D19]/45 hover:border-slate-700/60 transition-all duration-300 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[12px] font-bold text-slate-200">Post-Incident Reporting</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">Engine</span>
+              <span className="text-[9px] font-extrabold text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Operational
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 };

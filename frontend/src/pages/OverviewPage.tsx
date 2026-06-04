@@ -5,13 +5,13 @@ import {
   AlertTriangle, 
   Activity, 
   CheckCircle, 
-  Clock, 
   ShieldAlert, 
   Server, 
   Send,
   ArrowRight
 } from 'lucide-react';
 import { SeverityBadge } from '../components/dashboard/SeverityBadge';
+import { PageHeader } from '../components/layout/PageHeader';
 
 export const OverviewPage: React.FC = () => {
   const { incidents, fetchIncidents, systemHealth, fetchSystemHealth } = useIncidentStore();
@@ -58,17 +58,13 @@ export const OverviewPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 w-full text-slate-100 select-none">
       {/* Title */}
-      <div className="animate-fade-in-up delay-0">
-        <h1 className="text-4xl font-extrabold tracking-tight text-slate-100 bg-gradient-to-r from-slate-100 via-slate-200 to-slate-350 bg-clip-text text-transparent font-sans">
-          AI Incident Management Overview
-        </h1>
-        <p className="text-[13.5px] text-slate-400 mt-2 font-medium">
-          Real-time monitoring of incidents, escalations, system health, and operational intelligence.
-        </p>
-      </div>
+      <PageHeader 
+        title="AI Incident Management Overview" 
+        subtitle="Real-time monitoring of incidents, escalations, system health, and operational intelligence." 
+      />
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* KPI 1: Active Incidents */}
         <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-0">
           <div className="flex justify-between items-center">
@@ -93,20 +89,8 @@ export const OverviewPage: React.FC = () => {
           </div>
         </div>
 
-        {/* KPI 3: MTTR */}
+        {/* KPI 3: Escalations Today */}
         <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-120">
-          <div className="flex justify-between items-center">
-            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">Mean Time To Resolve</span>
-            <Clock className="w-4.5 h-4.5 text-sky-400" />
-          </div>
-          <div className="mt-4">
-            <span className="text-3xl font-extrabold text-slate-100 leading-none tracking-tight">14m</span>
-            <span className="text-[10px] text-sky-400 block mt-1.5 font-bold">Average resolution latency</span>
-          </div>
-        </div>
-
-        {/* KPI 4: Escalations Today */}
-        <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-180">
           <div className="flex justify-between items-center">
             <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">Escalations Today</span>
             <Send className="w-4.5 h-4.5 text-amber-500" />
@@ -119,27 +103,27 @@ export const OverviewPage: React.FC = () => {
           </div>
         </div>
 
-        {/* KPI 5: Resolved Incidents */}
-        <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-240">
+        {/* KPI 4: Resolved Incidents */}
+        <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-180">
           <div className="flex justify-between items-center">
             <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">Resolved Incidents</span>
             <CheckCircle className="w-4.5 h-4.5 text-emerald-400" />
           </div>
           <div className="mt-4">
             <span className="text-3xl font-extrabold text-slate-100 leading-none tracking-tight">{resolvedCount}</span>
-            <span className="text-[10px] text-emerald-450 block mt-1.5 font-bold">Mitigated failures</span>
+            <span className="text-[10px] text-emerald-455 block mt-1.5 font-bold">Mitigated failures</span>
           </div>
         </div>
 
-        {/* KPI 6: Closed Postmortems */}
-        <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-300">
+        {/* KPI 5: Closed Postmortems */}
+        <div className="kpi-card rounded-2xl bg-[#0B1020]/90 p-5 flex flex-col justify-between shadow-md relative overflow-hidden min-h-[120px] animate-fade-in-up delay-240">
           <div className="flex justify-between items-center">
             <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">Closed Postmortems</span>
             <Activity className="w-4.5 h-4.5 text-indigo-400" />
           </div>
           <div className="mt-4">
             <span className="text-3xl font-extrabold text-slate-100 leading-none tracking-tight">{resolvedCount}</span>
-            <span className="text-[10px] text-indigo-450 block mt-1.5 font-bold">Written RCA documents</span>
+            <span className="text-[10px] text-indigo-455 block mt-1.5 font-bold">Written RCA documents</span>
           </div>
         </div>
       </div>

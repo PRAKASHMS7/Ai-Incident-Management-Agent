@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useIncidentStore, usePolling } from '../api/client';
 import { Clock, Eye, AlertTriangle, ShieldCheck, Users, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/layout/PageHeader';
 
 const getStatusClass = (state: string) => {
   const s = state.toLowerCase();
@@ -107,19 +108,10 @@ export const TimelinePage: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 w-full text-slate-100 select-none">
       {/* Header with animation */}
-      <div className="bg-[#0B1020]/80 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg animate-fade-in-up delay-0">
-        <div className="flex flex-col gap-1 z-10">
-          <h2 className="text-2xl md:text-3xl font-black font-sans tracking-tight bg-gradient-to-r from-white via-slate-200 to-purple-400 bg-clip-text text-transparent">
-            Timeline Logs Archive
-          </h2>
-          <p className="text-[13px] text-slate-400 mt-1">
-            Audit trail of incident occurrences, AI diagnostic triggers, and operator confirmation actions.
-          </p>
-        </div>
-        <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shadow-md shrink-0">
-          <Clock className="w-5 h-5 animate-pulse" />
-        </div>
-      </div>
+      <PageHeader 
+        title="Timeline" 
+        subtitle="Audit trail of incident occurrences, AI diagnostic triggers, and operator confirmation actions." 
+      />
 
       {incidents.length === 0 ? (
         <div className="border border-slate-800 rounded-2xl bg-[#0B1020]/60 p-12 text-center text-slate-500 text-xs animate-fade-in-up delay-60">

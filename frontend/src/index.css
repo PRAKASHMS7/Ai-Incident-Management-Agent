@@ -899,6 +899,130 @@
   transition: all 0.3s ease;
 }
 
+/* ==========================================================================
+   GLOBAL TYPOGRAPHY SCALE PATCH
+   ========================================================================== */
+
+/* 1. Global / Body Typography Base */
+html, body {
+  font-size: 16px !important;
+}
+
+/* 2. Page Titles (H1): 48px, font-weight 800 */
+main h1, 
+.text-4xl, 
+.text-5xl, 
+.text-6xl,
+[class*="text-4xl"],
+[class*="text-5xl"],
+[class*="text-6xl"] {
+  font-size: 48px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+
+/* 3. Section Titles (H2): 32px, font-weight 700 */
+main h2, 
+.text-2xl, 
+.text-3xl,
+[class*="text-2xl"],
+[class*="text-3xl"] {
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+}
+
+/* 4. Card Titles & H3 (approx. 15% increase) */
+main h3,
+.text-lg,
+.text-xl,
+[class*="text-lg"],
+[class*="text-xl"],
+[class*="text-[13px]"],
+[class*="text-[13.5px]"],
+[class*="text-[14px]"],
+[class*="text-[14.5px]"],
+[class*="text-[15.5px]"],
+[class*="text-[16px]"] {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+/* 5. Body Text (16px minimum) */
+p, 
+span:not(.font-mono):not([class*="font-mono"]), 
+li,
+.text-sm,
+.text-base,
+[class*="text-sm"],
+[class*="text-base"] {
+  font-size: 16px !important;
+}
+
+/* 6. Small Labels (Increased slightly for readability) */
+[class*="text-[8px]"] {
+  font-size: 10px !important;
+}
+[class*="text-[9px]"],
+[class*="text-[9.5px]"] {
+  font-size: 11px !important;
+}
+[class*="text-[10px]"],
+[class*="text-[10.5px]"] {
+  font-size: 12px !important;
+}
+[class*="text-[11px]"],
+[class*="text-[11.5px]"]:not(.font-mono) {
+  font-size: 13px !important;
+}
+.text-xs,
+[class*="text-xs"] {
+  font-size: 14px !important;
+}
+
+/* 7. Table Text (Increase by 1 step) */
+table th {
+  font-size: 12px !important;
+}
+table td:not(.font-mono) {
+  font-size: 14px !important;
+}
+
+/* 8. Incident IDs (Keep current size at 12px / 11.5px) */
+/* 8. Incident IDs (Keep current size at 12px / 11.5px) */
+.font-mono,
+[class*="font-mono"],
+[class*="text-[11.5px]"].font-mono,
+[class*="text-[12.5px]"].font-mono,
+table td.font-mono {
+  font-size: 12px !important;
+}
+
+/* 9. Brand & Subtitle Animations (Glow & Fade-in) */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.95;
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.15));
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s infinite ease-in-out;
+}
+
 
 
 
